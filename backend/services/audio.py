@@ -14,7 +14,6 @@ if settings.OPENAI_API_KEY:
 
 # Phrases Whisper is known to emit when fed silence or near-silence audio.
 # Only includes clearly spurious outputs.  Legitimate short utterances
-# (e.g. "hello", "check my balance") are kept; dead-air is filtered
 # upstream by the minimum-byte-size checks before transcription is attempted.
 HALLUCINATIONS = [
     "copyright",
@@ -46,6 +45,7 @@ def transcribe_audio(audio_bytes: bytes) -> str:
         transcript = client.audio.transcriptions.create(
             model=settings.STT_MODEL,
             file=audio_file,
+            temperature=0,
             response_format="text",
             language=settings.STT_LANGUAGE,
             prompt=settings.STT_PROMPT,

@@ -26,7 +26,7 @@ class Config:
     # Audio - STT
     STT_MODEL = os.getenv("STT_MODEL", "whisper-1")
     STT_LANGUAGE = os.getenv("STT_LANGUAGE", "en")
-    STT_PROMPT = os.getenv("STT_PROMPT", "Bank ABC. Checking balance. Transfer money. Credit card. Account. Identity verification.")
+    STT_PROMPT = os.getenv("STT_PROMPT", "Bank ABC. Customer ID. PIN number. OTP code. ATM. beneficiary. card declined. disputed transaction.")
 
     # Audio - TTS
     TTS_MODEL = os.getenv("TTS_MODEL", "tts-1")
