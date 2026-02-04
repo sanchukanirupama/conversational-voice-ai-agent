@@ -217,18 +217,45 @@ def flow_executor(state: AgentState):
         "unless you use the provided tools. DO NOT hallucinate or guess numbers. "
         "Always call the tool to get the latest data."
     )
+    
+    termination_safety = (
+        "\n\nTERMINATION RULE: NEVER call t_end_call to finish a task. "
+        "Only call t_end_call when the USER explicitly says goodbye or asks to end the call. "
+        "If you have completed a task (like verification), ask the user what else they need."
+    )
 
-    sys_msg = f"{base_persona}\n\nCurrent Flow: {flow}\n{workaround_instruction}{strict_rule}{permission_note}"
+    sys_msg = f"{base_persona}\n\nCurrent Flow: {flow}\n{workaround_instruction}{strict_rule}{termination_safety}{permission_note}"
     
     # Safe invoke
     response = llm.invoke([SystemMessage(content=sys_msg)] + messages)
     
+    # Logic fix: Only end call if t_end_call is the ONLY tool or coupled with non-operational tools.
+    # If we are verifying identity, we should NOT end the call even if the LLM hallucinated t_end_call.
+    
     is_call_over = False
+    other_tools_present = False
+    if response.tool_calls:
+        other_tools_present = any(tc['name'] != 't_end_call' for tc in response.tool_calls)
+    
     if response.tool_calls:
          for tc in response.tool_calls:
             if tc['name'] == 't_end_call':
-                is_call_over = True
+                # Heuristic: If agent text suggests continuation ("Let me check..."), ignore end_call
+                text_content = str(response.content).lower()
+                is_continuation = "check" in text_content or "verify" in text_content or "assist" in text_content
+                
+                if not other_tools_present and not is_continuation:
+                    is_call_over = True
+                else:
+                    # Strip t_end_call from execution to prevent weird behavior
+                    # We want the other tools to run, then the agent loops back.
+                    # It can decide to end call LATER.
+                    pass
     
+    # Filter out t_end_call if other tools are present to avoid stopping the graph
+    if other_tools_present:
+        response.tool_calls = [tc for tc in response.tool_calls if tc['name'] != 't_end_call']
+
     return {"messages": [response], "is_call_over": is_call_over}
 
 # --- GRAPH ---
