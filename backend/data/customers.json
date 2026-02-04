@@ -1,0 +1,34 @@
+[
+  {
+    "customer_id": "cust_001",
+    "pin": "1234",
+    "name": "Alice Johnson",
+    "account_balance": 2500.50,
+    "card_id": "card_9876",
+    "card_status": "active",
+    "recent_transactions": [
+      {"date": "2023-10-25", "amount": -50.00, "description": "Grocery Store"},
+      {"date": "2023-10-24", "amount": -120.00, "description": "Electric Bill"},
+      {"date": "2023-10-20", "amount": 2000.00, "description": "Paycheck"}
+    ],
+    "profile": {
+        "phone": "+15550101",
+        "address": "123 Main St, Anytown, USA"
+    }
+  },
+  {
+    "customer_id": "cust_002",
+    "pin": "5678",
+    "name": "Bob Smith",
+    "account_balance": 500.00,
+    "card_id": "card_5432",
+    "card_status": "blocked",
+    "recent_transactions": [
+       {"date": "2023-10-26", "amount": -15.00, "description": "Coffee Shop"}
+    ],
+     "profile": {
+        "phone": "+15550102",
+        "address": "456 Oak Ave, Somecity, USA"
+    }
+  }
+]
