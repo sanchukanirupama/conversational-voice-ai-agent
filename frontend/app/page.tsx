@@ -1,8 +1,8 @@
 "use client";
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useAudioRecorder } from './hooks/useAudioRecorder';
-import { BackgroundCircles } from '@/components/ui/background-circles';
-import { AIVoiceInput } from '@/components/ui/ai-voice-input';
+import { SiriWaveform } from '@/components/ui/siri-waveform';
+import { Mic, PhoneOff } from 'lucide-react';
 
 export default function Home() {
   const [isCallActive, setIsCallActive] = useState(false);
@@ -17,6 +17,83 @@ export default function Home() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const shouldDisconnectRef = useRef(false);
+  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const ringingNodesRef = useRef<{ osc1: OscillatorNode; osc2: OscillatorNode; gain: GainNode } | null>(null);
+
+  const stopRinging = () => {
+    if (ringingNodesRef.current) {
+        try {
+            const { osc1, osc2, gain } = ringingNodesRef.current;
+            osc1.stop();
+            osc2.stop();
+            osc1.disconnect();
+            osc2.disconnect();
+            gain.disconnect();
+        } catch (e) {
+            console.error("Error stopping ringing:", e);
+        }
+        ringingNodesRef.current = null;
+    }
+  };
+
+  const startRinging = () => {
+    stopRinging(); // Ensure clear before start
+    
+    if (!audioContext.current) {
+        audioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    const ctx = audioContext.current;
+    
+    // Standard US Ringtone: 440Hz + 480Hz
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc1.frequency.setValueAtTime(440, ctx.currentTime);
+    osc2.frequency.setValueAtTime(480, ctx.currentTime);
+    
+    osc1.type = 'sine';
+    osc2.type = 'sine';
+    
+    // Pulse pattern: 2s ON, 4s OFF
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(0, now);
+    
+    // Create a loop of rings for 30 seconds
+    for (let i = 0; i < 5; i++) {
+        const start = now + (i * 6);
+        const end = start + 2;
+        // Fade in/out slightly to avoid clicks
+        gain.gain.setTargetAtTime(0.1, start, 0.05); 
+        gain.gain.setTargetAtTime(0, end, 0.05);
+    }
+
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc1.start();
+    osc2.start();
+    
+    ringingNodesRef.current = { osc1, osc2, gain };
+  };
+
+  const startIdleTimer = () => {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => {
+        console.log('Idle timeout triggered');
+        if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+            ws.current.send(JSON.stringify({ type: 'timeout' }));
+        }
+    }, 8000); // 8 seconds
+  };
+
+  const stopIdleTimer = () => {
+      if (idleTimerRef.current) {
+          clearTimeout(idleTimerRef.current);
+          idleTimerRef.current = null;
+      }
+  };
 
   // Play audio from base64
   const playAudio = async (base64Audio: string) => {
@@ -60,14 +137,12 @@ export default function Home() {
           const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
           analyserRef.current.getByteFrequencyData(dataArray);
           
-          // Calculate average level
           let sum = 0;
           for (let i = 0; i < dataArray.length; i++) {
             sum += dataArray[i];
           }
           const average = sum / dataArray.length;
-          // Normalize to 0-1
-          setAudioLevel(average / 128); // Division by 128 to make it more sensitive/visible
+          setAudioLevel(average / 128); 
           
           animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
         }
@@ -82,6 +157,9 @@ export default function Home() {
             setAudioLevel(0);
         }
         
+        // Agent finished speaking, start idle timer
+        startIdleTimer();
+        
         if (shouldDisconnectRef.current) {
             setIsCallActive(false);
             shouldDisconnectRef.current = false;
@@ -89,6 +167,9 @@ export default function Home() {
       };
     } catch (e) {
       console.error('Error playing audio', e);
+      stopRinging(); // safety
+      setIsAgentSpeaking(false);
+      startIdleTimer(); // Fallback: start timer if audio fails
     }
   };
 
@@ -99,6 +180,7 @@ export default function Home() {
         sourceNodeRef.current.stop();
         sourceNodeRef.current = null;
         setIsAgentSpeaking(false);
+        stopIdleTimer(); // Stop timer if we interrupt playback
         if (animationFrameRef.current) {
             cancelAnimationFrame(animationFrameRef.current);
             setAudioLevel(0);
@@ -112,6 +194,7 @@ export default function Home() {
     isWaitingForResponse,
     onAudioAvailable: (blob) => {
       setIsWaitingForResponse(true);
+      stopIdleTimer(); // Stop timer when user speaks
 
       const reader = new FileReader();
       reader.readAsDataURL(blob);
@@ -119,7 +202,7 @@ export default function Home() {
         const base64data = reader.result as string;
         if (ws.current && ws.current.readyState === WebSocket.OPEN) {
           ws.current.send(JSON.stringify({ type: 'audio', data: base64data }));
-          setTranscript((prev) => [...prev, 'You: (Audio Sent)']);
+          setTranscript((prev) => [...prev, 'You: ...']); 
         } else {
           setIsWaitingForResponse(false);
         }
@@ -128,14 +211,14 @@ export default function Home() {
     onSpeechStart: () => {
       console.log('Speech detected - Interrupting Agent');
       stopAudioPlayback();
+      stopIdleTimer(); // Reset timer on speech start
     },
   });
 
   const startCall = () => {
     setIsCallActive(true);
-    shouldDisconnectRef.current = false; // Reset disconnect flag
-    // Use window.location.hostname to connect to the backend running on the same host but port 8000
-    // If you are developing locally, it will likely be localhost
+    shouldDisconnectRef.current = false; 
+    startRinging(); // Start ringing sound
     const wsUrl = `ws://${window.location.hostname}:8000/ws`;
     ws.current = new WebSocket(wsUrl);
 
@@ -147,18 +230,26 @@ export default function Home() {
     ws.current.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === 'audio') {
+        stopRinging(); // Stop ringing when agent responds
         setIsWaitingForResponse(false);
-        setTranscript((prev) => [...prev, `Agent: ${data.content}`]);
+        if (data.content) {
+             setTranscript((prev) => [...prev, `Agent: ${data.content}`]);
+        }
         if (data.audio) {
           playAudio(data.audio);
+        } else {
+            // No audio provided, start timer immediately
+            startIdleTimer();
         }
       }
     };
 
     ws.current.onclose = () => {
       console.log('WS Disconnected');
+      stopRinging(); // Safety stop
       setIsWaitingForResponse(false);
       stopRecording();
+      stopIdleTimer();
 
       if (sourceNodeRef.current) {
           console.log('Audio still playing, waiting to disconnect UI...');
@@ -171,11 +262,7 @@ export default function Home() {
 
   const endCall = () => {
     if (ws.current) ws.current.close();
-    // ws.onclose will handle the state updates, but we force it here 
-    // in case onclose doesn't fire immediately or we want instant feedback logic?
-    // Actually, if we call close(), onclose will fire.
-    // But if we want to stop audio immediately when USER clicks end:
-    shouldDisconnectRef.current = false; // Don't delay if user explicitly ends
+    shouldDisconnectRef.current = false;
     setIsCallActive(false);
     setIsAgentSpeaking(false);
     setIsWaitingForResponse(false);
@@ -183,76 +270,57 @@ export default function Home() {
     stopRecording();
   };
 
+  // Get the last relevant message for the "subtitle" display
+  const lastMessage = transcript.length > 0 ? transcript[transcript.length - 1] : "";
+  const displayMessage = lastMessage.replace(/^(You|Agent): /, '');
+
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-white dark:bg-black/90">
+    <div className="relative min-h-screen w-full overflow-hidden bg-[#0A0A0A] text-white flex flex-col items-center justify-center">
         
-        {/* Background Animation */}
-        <div className="absolute inset-0 z-0">
-             <BackgroundCircles 
-                variant="octonary" 
-                audioLevel={audioLevel} 
-                isActive={isCallActive}
-            />
-        </div>
-
-        {/* Content */}
-        <div className="relative z-10 flex flex-col items-center justify-between min-h-screen p-4">
-            
-            {/* Header */}
-            <header className="w-full max-w-4xl flex justify-between items-center pt-8">
-                 <h1 className="text-2xl font-bold tracking-tighter bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
-                  Bank ABC AI Agent
-                </h1>
-            </header>
-
-            {/* Main Interaction Area */}
-            <main className="flex-1 flex flex-col items-center justify-center w-full max-w-lg gap-12">
-                
-                <div className="w-full flex justify-center">
-                    <AIVoiceInput 
-                        onStart={startCall}
-                        onStop={endCall}
-                        isConnected={isCallActive}
-                    />
+        {/* Dynamic Waveform Visualization */}
+        <div className="w-full max-w-4xl h-96 flex items-center justify-center">
+            {isCallActive ? (
+                <SiriWaveform audioLevel={audioLevel} />
+            ) : (
+                <div className="text-gray-500 font-light text-2xl animate-pulse">
+                    Tap to start assistant
                 </div>
-
-                {isRecording && !isAgentSpeaking && (
-                    <div className="text-emerald-500 font-mono text-sm animate-pulse">
-                         Listening...
-                    </div>
-                )}
-                 
-                 {isWaitingForResponse && (
-                     <div className="text-gray-400 font-mono text-sm">
-                         Thinking...
-                     </div>
-                 )}
-
-            </main>
-
-            {/* Transcript / Footer */}
-            <footer className="w-full max-w-2xl h-48 mb-8 transition-all duration-500 ease-in-out">
-                {isCallActive && (
-                    <div className="w-full bg-white/50 dark:bg-black/40 backdrop-blur-md border border-gray-200 dark:border-white/10 rounded-2xl p-4 h-full overflow-y-auto shadow-sm">
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-3 font-mono uppercase tracking-widest sticky top-0 bg-transparent">Live Transcript</div>
-                        <div className="space-y-3">
-                            {transcript.map((line, i) => (
-                                <div key={i} className={`flex ${line.includes('You') ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`
-                                        max-w-[80%] p-3 rounded-2xl text-sm
-                                        ${line.includes('You') 
-                                            ? 'bg-blue-500 text-white rounded-br-none' 
-                                            : 'bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 rounded-bl-none'}
-                                    `}>
-                                        {line.replace(/^(You|Agent): /, '')}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </footer>
+            )}
         </div>
+
+        {/* Transcription Subtitle */}
+        <div className="w-full max-w-2xl text-center min-h-[100px] flex items-center justify-center px-4">
+            {isCallActive && displayMessage && (
+                <h2 className="text-2xl md:text-3xl font-medium text-white/90 leading-relaxed transition-all duration-500">
+                    "{displayMessage}"
+                </h2>
+            )}
+            {isCallActive && isWaitingForResponse && !displayMessage && (
+                <span className="text-white/50 text-xl font-light italic">Listening...</span>
+            )}
+        </div>
+
+        {/* Control Button */}
+        <div className="mt-12 mb-12">
+            {!isCallActive ? (
+                <button 
+                    onClick={startCall}
+                    className="group relative flex items-center justify-center w-16 h-16 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 transition-all duration-300 hover:scale-110"
+                >
+                    <Mic className="w-6 h-6 text-white" />
+                    <span className="absolute -bottom-8 text-xs text-white/40 font-mono tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">START</span>
+                </button>
+            ) : (
+                <button 
+                    onClick={endCall}
+                    className="group relative flex items-center justify-center w-16 h-16 rounded-full bg-red-500/20 hover:bg-red-500/40 backdrop-blur-md border border-red-500/50 transition-all duration-300 hover:scale-110"
+                >
+                    <PhoneOff className="w-6 h-6 text-red-500" />
+                    <span className="absolute -bottom-8 text-xs text-red-400/80 font-mono tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">END</span>
+                </button>
+            )}
+        </div>
+        
     </div>
   );
 }

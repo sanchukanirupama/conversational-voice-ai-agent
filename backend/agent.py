@@ -260,3 +260,52 @@ workflow.add_conditional_edges("agent", should_continue)
 workflow.add_edge("tools", "gate") 
 
 app_graph = workflow.compile()
+
+async def generate_contextual_response(messages: List[BaseMessage], type: Literal["nudge", "closing_silence", "closing_goodbye"]) -> str:
+    """
+    Generates a context-aware system message (nudge or goodbyes) using a lightweight LLM.
+    Used by the WebSocket handler to manage idle timeouts and disconnects naturally.
+    """
+    llm = ChatOpenAI(model=settings.LLM_MODEL, temperature=0.7)
+    
+    if type == "nudge":
+        prompt = (
+            "The user has been silent for a while. "
+            "Generate a short, polite, 1-sentence nudge asking if they are still there or if they need more time. "
+            "Do NOT repeat the last assistant message. Keep it natural."
+        )
+    elif type == "closing_silence":
+        prompt = (
+            "The user has been silent for too long. "
+            "Generate a polite 1-sentence closing message to end the call (e.g., 'I didn't hear a response, so I will end the call')."
+        )
+    elif type == "closing_goodbye":
+        prompt = (
+            "The call is ending. Generate a warm, polite 1-sentence goodbye message (e.g. 'Thank you for calling Bank ABC, have a great day.')."
+        )
+    else:
+        return "Are you still there?"
+
+    # We only pass the last few messages to keep context but keep it cheap
+    # Sanitize history to avoid OpenAI API errors (dangling tool_calls)
+    # We must strip 'tool_calls' from AIMessages because we are not including the ToolMessages
+    recent_messages = []
+    for m in messages[-10:]: # Look at last 10, keep last ~4 valid ones
+        if isinstance(m, HumanMessage):
+            recent_messages.append(m)
+        elif isinstance(m, AIMessage):
+            # If the AIMessage has content, use it (but strip tool_calls by creating a fresh object)
+            if m.content:
+                recent_messages.append(AIMessage(content=str(m.content)))
+    
+    recent_history = recent_messages[-4:]
+    
+    try:
+        response = await llm.ainvoke([SystemMessage(content=prompt)] + recent_history)
+        return response.content.strip() or "Are you still there?"
+    except Exception as e:
+        print(f"Error generating system message: {e}")
+        # Fallbacks
+        if type == "nudge": return "Are you still there?"
+        if type == "closing_silence": return "I am not hearing any response. Goodbye."
+        return "Thank you for calling. Goodbye."

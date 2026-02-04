@@ -2,7 +2,7 @@ import json
 import asyncio
 import base64
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from backend.agent import app_graph
+from backend.agent import app_graph, generate_contextual_response
 from backend.config import settings
 from backend.services.audio import generate_audio, transcribe_audio
 from langchain_core.messages import HumanMessage
@@ -11,6 +11,7 @@ router = APIRouter()
 
 # Audio payloads smaller than this cannot contain real speech.
 MIN_AUDIO_BYTES = 1000
+MAX_SILENCE_NUDGES = 2
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -26,6 +27,7 @@ async def websocket_endpoint(websocket: WebSocket):
     }
 
     loop = asyncio.get_running_loop()
+    silence_count = 0
 
     try:
         # Send Greeting with Audio
@@ -41,6 +43,7 @@ async def websocket_endpoint(websocket: WebSocket):
         }))
 
         while True:
+            # Wait for any message from frontend (audio or timeout signal)
             data = await websocket.receive_text()
             
             try:
@@ -48,6 +51,36 @@ async def websocket_endpoint(websocket: WebSocket):
             except json.JSONDecodeError:
                 payload = {"type": "text", "text": data}
 
+            # Handle Timeout Signal from Frontend
+            if payload.get("type") == "timeout":
+                print("Frontend reported Idle Timeout.")
+                silence_count += 1
+                
+                if silence_count > MAX_SILENCE_NUDGES:
+                    print("Max silence reached. Ending call.")
+                    closing_text = await generate_contextual_response(session_state["messages"], "closing_silence")
+                    closing_audio = await loop.run_in_executor(None, generate_audio, closing_text)
+                    await websocket.send_text(json.dumps({
+                        "type": "audio",
+                        "content": closing_text,
+                        "audio": closing_audio
+                    }))
+                    # Allow playback time then close
+                    await asyncio.sleep(len(closing_text) * 0.1) 
+                    break
+                
+                # Send Nudge
+                nudge_text = await generate_contextual_response(session_state["messages"], "nudge")
+                nudge_audio = await loop.run_in_executor(None, generate_audio, nudge_text)
+                await websocket.send_text(json.dumps({
+                    "type": "audio",
+                    "content": nudge_text,
+                    "audio": nudge_audio
+                }))
+                continue
+
+            # Reset silence count on any valid user input
+            silence_count = 0
             user_text = ""
             
             if payload.get("type") == "audio":
@@ -60,7 +93,6 @@ async def websocket_endpoint(websocket: WebSocket):
                     
                     # Guard: skip payloads too small to contain speech
                     if len(audio_bytes) < MIN_AUDIO_BYTES:
-                        print(f"Skipped audio: only {len(audio_bytes)} bytes")
                         continue
                         
                     # Run Transcribe in Thread
@@ -78,7 +110,14 @@ async def websocket_endpoint(websocket: WebSocket):
             session_state["messages"].append(HumanMessage(content=user_text))
             
             # Run graph
-            final_state = await app_graph.ainvoke(session_state)
+            final_state = await app_graph.ainvoke(
+                session_state,
+                config={
+                    "run_name": "BankAgentConversation",
+                    "tags": ["voice_agent_websocket"],
+                    "metadata": {"customer_id": session_state.get("customer_id", "unknown")}
+                }
+            )
             
             # Get latest response
             last_msg = final_state["messages"][-1]
@@ -91,7 +130,7 @@ async def websocket_endpoint(websocket: WebSocket):
             
             # Fallback for silent disconnects: Ensure we say goodbye if the agent didn't
             if not response_text and final_state.get("is_call_over"):
-                response_text = "Thank you for calling Bank ABC. Have a great day."
+                response_text = await generate_contextual_response(session_state["messages"], "closing_goodbye")
             
             # Send Text First (Low Latency feedback)
             if not response_text:
