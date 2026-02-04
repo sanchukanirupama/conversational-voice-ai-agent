@@ -37,4 +37,14 @@ class Config:
     CUSTOMERS_FILE = os.getenv("CUSTOMERS_FILE", "backend/data/customers.json")
     DEFAULT_TRANSACTION_COUNT = int(os.getenv("DEFAULT_TRANSACTION_COUNT", "3"))
 
+    def load_prompts(self):
+        import json
+        try:
+            with open(self.PROMPTS_FILE, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading prompts: {e}")
+            return {}
+
 settings = Config()
+settings.PROMPTS = settings.load_prompts()

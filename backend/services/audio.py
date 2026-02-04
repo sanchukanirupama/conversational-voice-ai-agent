@@ -48,7 +48,7 @@ def transcribe_audio(audio_bytes: bytes) -> str:
             temperature=0,
             response_format="text",
             language=settings.STT_LANGUAGE,
-            prompt=settings.STT_PROMPT,
+            prompt=settings.PROMPTS.get("stt_prompt", settings.STT_PROMPT),
         )
 
         # Reject known Whisper hallucination phrases

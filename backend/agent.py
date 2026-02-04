@@ -9,14 +9,10 @@ from langchain_core.tools import tool
 from backend.config import settings
 from backend.tools import verify_identity, get_recent_transactions, block_card, get_account_balance, get_customer_by_id
 
-# Load Prompts
-try:
-    with open(settings.PROMPTS_FILE, 'r') as f:
-        SYS_PROMPTS = json.load(f)
-except FileNotFoundError:
+SYS_PROMPTS = settings.PROMPTS
+if not SYS_PROMPTS:
     SYS_PROMPTS = {"system_persona": "You are a banking assistant.", "routing_flows": {}}
 
-# Define Tools for the LLM
 @tool
 def t_verify_identity(customer_id: str, pin: str) -> str:
     """Verifies customer identity. REQUIRED before accessing account details."""
@@ -43,28 +39,23 @@ def t_block_card(card_id: str) -> str:
         return "Card blocked successfully."
     return "Failed to block card."
 
-tools = [t_verify_identity, t_get_balance, t_get_transactions, t_block_card]
+@tool
+def t_end_call() -> str:
+    """Terminates the current call. Call this ONLY when the user indicates they are done or says goodbye."""
+    return "Call terminated."
+
+tools = [t_verify_identity, t_get_balance, t_get_transactions, t_block_card, t_end_call]
+
+from langgraph.graph.message import add_messages
 
 # State Definition
 class AgentState(TypedDict):
-    messages: List[BaseMessage]
+    messages: Annotated[List[BaseMessage], add_messages]
     customer_id: str | None
     is_verified: bool
+    is_call_over: bool
 
 # Nodes
-def call_model(state: AgentState):
-    messages = state['messages']
-    
-    # Prepend System Prompt
-    if not isinstance(messages[0], SystemMessage):
-        messages.insert(0, SystemMessage(content=SYS_PROMPTS['system_persona']))
-    
-    # Conditional logic for verification enforcement could go here or in system prompt
-    # We will rely on System Prompt + specialized prompt injection for now
-    
-    model = ChatOpenAI(model=settings.LLM_MODEL, temperature=settings.LLM_TEMPERATURE).bind_tools(tools)
-    response = model.invoke(messages)
-    return {"messages": [response]}
 
 def should_continue(state: AgentState) -> Literal["tools", "__end__"]:
     messages = state['messages']
@@ -73,11 +64,6 @@ def should_continue(state: AgentState) -> Literal["tools", "__end__"]:
     if last_message.tool_calls:
         return "tools"
     return "__end__"
-
-def tool_node_wrapper(state: AgentState):
-    # wrapper to handle tool outputs and verification state updates?
-    # For simplicity using prebuilt ToolNode, but we might want to capture successful verification
-    pass
 
 # We'll use the prelbuilt ToolNode but we might need to intercept 't_verify_identity' success to update state['is_verified']
 # For now, let's trust the properties and just let the model run.
@@ -154,7 +140,14 @@ def agent_node(state: AgentState):
     if model:
         response = model.invoke([SystemMessage(content=sys_msg)] + messages)
     
-    return {"messages": [response]}
+    # Check if call is over (detect tool call or intent in content)
+    is_call_over = state.get("is_call_over", False)
+    if response.tool_calls:
+        for tc in response.tool_calls:
+            if tc['name'] == 't_end_call':
+                is_call_over = True
+    
+    return {"messages": [response], "is_call_over": is_call_over}
 
 # Graph Construction
 workflow = StateGraph(AgentState)
