@@ -5,7 +5,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from backend.agent import app_graph, generate_contextual_response
 from backend.config import settings
 from backend.services.audio import generate_audio, transcribe_audio
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 
 router = APIRouter()
 
@@ -41,6 +41,9 @@ async def websocket_endpoint(websocket: WebSocket):
             "content": greeting_text, 
             "audio": greeting_audio
         }))
+        
+        # Add Greeting to History so the Agent knows it has already spoken
+        session_state["messages"].append(AIMessage(content=greeting_text))
 
         while True:
             # Wait for any message from frontend (audio or timeout signal)
@@ -91,17 +94,29 @@ async def websocket_endpoint(websocket: WebSocket):
                     
                     audio_bytes = base64.b64decode(audio_b64)
                     
+                    
                     # Guard: skip payloads too small to contain speech
                     if len(audio_bytes) < MIN_AUDIO_BYTES:
-                        continue
-                        
-                    # Run Transcribe in Thread
-                    user_text = await loop.run_in_executor(None, transcribe_audio, audio_bytes)
-                    print(f"Transcribed: {user_text}")
+                         # Treat as empty
+                         user_text = ""
+                    else:    
+                        # Run Transcribe in Thread
+                        user_text = await loop.run_in_executor(None, transcribe_audio, audio_bytes)
+                        print(f"Transcribed: {user_text}")
             else:
                  user_text = payload.get("text", "")
             
             if not user_text or not user_text.strip():
+                # Handle empty/unintelligible input by asking to repeat (prevents dead air)
+                print("Received empty or unintelligible audio.")
+                pardon_text = await generate_contextual_response(session_state["messages"], "pardon")
+                pardon_audio = await loop.run_in_executor(None, generate_audio, pardon_text)
+                
+                await websocket.send_text(json.dumps({
+                    "type": "audio",
+                    "content": pardon_text,
+                    "audio": pardon_audio
+                }))
                 continue
 
             print(f"User: {user_text}")

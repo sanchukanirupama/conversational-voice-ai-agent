@@ -283,6 +283,11 @@ async def generate_contextual_response(messages: List[BaseMessage], type: Litera
         prompt = (
             "The call is ending. Generate a warm, polite 1-sentence goodbye message (e.g. 'Thank you for calling Bank ABC, have a great day.')."
         )
+    elif type == "pardon":
+        prompt = (
+            "The user said something but it was unintelligible or empty. "
+            "Generate a polite 1-sentence request for them to repeat themselves (e.g. 'I'm sorry, I didn't catch that. Could you say it again?')."
+        )
     else:
         return "Are you still there?"
 
@@ -290,7 +295,7 @@ async def generate_contextual_response(messages: List[BaseMessage], type: Litera
     # Sanitize history to avoid OpenAI API errors (dangling tool_calls)
     # We must strip 'tool_calls' from AIMessages because we are not including the ToolMessages
     recent_messages = []
-    for m in messages[-10:]: # Look at last 10, keep last ~4 valid ones
+    for m in messages[-10:]:
         if isinstance(m, HumanMessage):
             recent_messages.append(m)
         elif isinstance(m, AIMessage):

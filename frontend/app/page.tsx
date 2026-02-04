@@ -2,6 +2,7 @@
 import { useState, useRef } from 'react';
 import { useAudioRecorder } from './hooks/useAudioRecorder';
 import { SiriWaveform } from '@/components/ui/siri-waveform';
+import RetroGrid from '@/components/ui/retro-grid';
 import { Mic, PhoneOff } from 'lucide-react';
 
 export default function Home() {
@@ -19,6 +20,7 @@ export default function Home() {
   const shouldDisconnectRef = useRef(false);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const ringingNodesRef = useRef<{ osc1: OscillatorNode; osc2: OscillatorNode; gain: GainNode } | null>(null);
+  const hasGreetingPlayedRef = useRef(false);
 
   const stopRinging = () => {
     if (ringingNodesRef.current) {
@@ -103,6 +105,9 @@ export default function Home() {
         try { sourceNodeRef.current.stop(); } catch {}
       }
 
+      // Always clear timer when agent starts speaking
+      stopIdleTimer();
+
       if (!audioContext.current) {
         audioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
@@ -159,6 +164,12 @@ export default function Home() {
         
         // Agent finished speaking, start idle timer
         startIdleTimer();
+        
+        // Start recording only after the first greeting (or any speech) finishes
+        if (!isRecording) {
+            startRecording();
+            hasGreetingPlayedRef.current = true;
+        }
         
         if (shouldDisconnectRef.current) {
             setIsCallActive(false);
@@ -218,13 +229,14 @@ export default function Home() {
   const startCall = () => {
     setIsCallActive(true);
     shouldDisconnectRef.current = false; 
+    hasGreetingPlayedRef.current = false; // Reset greeting flag
     startRinging(); // Start ringing sound
     const wsUrl = `ws://${window.location.hostname}:8000/ws`;
     ws.current = new WebSocket(wsUrl);
 
     ws.current.onopen = () => {
       console.log('WS Connected');
-      startRecording();
+      // Do NOT start recording yet. Wait for greeting to finish.
     };
 
     ws.current.onmessage = (event) => {
@@ -276,14 +288,20 @@ export default function Home() {
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-[#0A0A0A] text-white flex flex-col items-center justify-center">
+        <RetroGrid />
         
         {/* Dynamic Waveform Visualization */}
         <div className="w-full max-w-4xl h-96 flex items-center justify-center">
             {isCallActive ? (
                 <SiriWaveform audioLevel={audioLevel} />
             ) : (
-                <div className="text-gray-500 font-light text-2xl animate-pulse">
-                    Tap to start assistant
+                <div className="text-center animate-pulse">
+                  <div className="text-gray-500 font-light text-2xl">
+                    Tap to talk to your AI assistant
+                  </div>
+                  <div className="text-gray-500 font-light text-xl">
+                    -- ABC Bank --
+                  </div>
                 </div>
             )}
         </div>
@@ -296,7 +314,16 @@ export default function Home() {
                 </h2>
             )}
             {isCallActive && isWaitingForResponse && !displayMessage && (
-                <span className="text-white/50 text-xl font-light italic">Listening...</span>
+                <span className="text-white/50 text-xl font-light italic">Processing...</span>
+            )}
+            {isCallActive && isRecording && !isAgentSpeaking && !isWaitingForResponse && (
+                 <div className="flex items-center gap-2 mt-2">
+                    <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </span>
+                    <span className="text-white/50 text-xl font-light">Listening...</span>
+                 </div>
             )}
         </div>
 
