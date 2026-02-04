@@ -25,7 +25,8 @@ def t_verify_identity(account_number: str = None, phone: str = None, customer_id
 
 @tool
 def t_get_balance(customer_id: str) -> str:
-    """Gets account balance. Requires customer_id (context)."""
+    """Gets the REAL account balance. You MUST use this tool to answer balance questions. 
+    Do NOT guess. Requires customer_id."""
     bal = get_account_balance(customer_id)
     return f"Current balance is ${bal}"
 
@@ -206,11 +207,18 @@ def flow_executor(state: AgentState):
     if is_verified:
         permission_note = (
             f"\n\n[SYSTEM UPDATE]: User is VERIFIED (Customer ID: {customer_id}). "
-            "You have permission to disclose account details, balances, and perform actions. "
+            "You have permission to disclose account details and perform actions. "
+            f"To check balance, call tool: t_get_balance(customer_id='{customer_id}'). "
             "Proceed with the user's request immediately."
         )
 
-    sys_msg = f"{base_persona}\n\nCurrent Flow: {flow}\n{workaround_instruction}{permission_note}"
+    strict_rule = (
+        "\n\nCRITICAL DATA RULE: You DO NOT know any account details (balance, transactions) "
+        "unless you use the provided tools. DO NOT hallucinate or guess numbers. "
+        "Always call the tool to get the latest data."
+    )
+
+    sys_msg = f"{base_persona}\n\nCurrent Flow: {flow}\n{workaround_instruction}{strict_rule}{permission_note}"
     
     # Safe invoke
     response = llm.invoke([SystemMessage(content=sys_msg)] + messages)

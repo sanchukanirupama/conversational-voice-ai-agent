@@ -80,6 +80,47 @@ export default function Home() {
     ringingNodesRef.current = { osc1, osc2, gain };
   };
 
+  const playDisconnectTone = () => {
+    if (!audioContext.current) return;
+    const ctx = audioContext.current;
+    
+    // Create oscillator for "beep"
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.frequency.setValueAtTime(480, ctx.currentTime);
+    osc.type = 'sine';
+    
+    const now = ctx.currentTime;
+    
+    // Quick Beep-Beep-Beep (Phone cut style)
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.1, now + 0.05);
+    gain.gain.linearRampToValueAtTime(0, now + 0.25);
+    
+    gain.gain.linearRampToValueAtTime(0.1, now + 0.35);
+    gain.gain.linearRampToValueAtTime(0, now + 0.55);
+
+    gain.gain.linearRampToValueAtTime(0.1, now + 0.65);
+    gain.gain.linearRampToValueAtTime(0, now + 0.85);
+    
+    osc.start(now);
+    osc.stop(now + 1.0);
+  };
+  
+  const handleCallEnded = () => {
+    playDisconnectTone();
+    setIsCallActive(false);
+    setTranscript([]); // Clear all chat memory
+    hasGreetingPlayedRef.current = false;
+    shouldDisconnectRef.current = false;
+    setIsAgentSpeaking(false);
+    setIsWaitingForResponse(false);
+  };
+
   const startIdleTimer = () => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     idleTimerRef.current = setTimeout(() => {
@@ -172,8 +213,7 @@ export default function Home() {
         }
         
         if (shouldDisconnectRef.current) {
-            setIsCallActive(false);
-            shouldDisconnectRef.current = false;
+            handleCallEnded();
         }
       };
     } catch (e) {
@@ -267,17 +307,14 @@ export default function Home() {
           console.log('Audio still playing, waiting to disconnect UI...');
           shouldDisconnectRef.current = true;
       } else {
-          setIsCallActive(false);
+          handleCallEnded();
       }
     };
   };
 
   const endCall = () => {
     if (ws.current) ws.current.close();
-    shouldDisconnectRef.current = false;
-    setIsCallActive(false);
-    setIsAgentSpeaking(false);
-    setIsWaitingForResponse(false);
+    // State cleanup will happen in onclose -> handleCallEnded
     stopAudioPlayback();
     stopRecording();
   };
@@ -316,7 +353,7 @@ export default function Home() {
             {isCallActive && isWaitingForResponse && !displayMessage && (
                 <span className="text-white/50 text-xl font-light italic">Processing...</span>
             )}
-            {isCallActive && isRecording && !isAgentSpeaking && !isWaitingForResponse && (
+            {/* {isCallActive && isRecording && !isAgentSpeaking && !isWaitingForResponse && (
                  <div className="flex items-center gap-2 mt-2">
                     <span className="relative flex h-3 w-3">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -324,7 +361,7 @@ export default function Home() {
                     </span>
                     <span className="text-white/50 text-xl font-light">Listening...</span>
                  </div>
-            )}
+            )} */}
         </div>
 
         {/* Control Button */}
