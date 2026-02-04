@@ -69,7 +69,7 @@ async def websocket_endpoint(websocket: WebSocket):
             else:
                  user_text = payload.get("text", "")
             
-            if not user_text:
+            if not user_text or not user_text.strip():
                 continue
 
             print(f"User: {user_text}")
@@ -88,6 +88,10 @@ async def websocket_endpoint(websocket: WebSocket):
             session_state = final_state
             
             print(f"Agent: {response_text}")
+            
+            # Fallback for silent disconnects: Ensure we say goodbye if the agent didn't
+            if not response_text and final_state.get("is_call_over"):
+                response_text = "Thank you for calling Bank ABC. Have a great day."
             
             # Send Text First (Low Latency feedback)
             if not response_text:

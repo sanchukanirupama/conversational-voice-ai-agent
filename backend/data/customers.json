@@ -1,6 +1,7 @@
 [
   {
     "customer_id": "cust_001",
+    "account_number": "1001",
     "pin": "1234",
     "name": "Alice Johnson",
     "account_balance": 2500.50,
@@ -18,6 +19,7 @@
   },
   {
     "customer_id": "cust_002",
+    "account_number": "1002",
     "pin": "5678",
     "name": "Bob Smith",
     "account_balance": 500.00,

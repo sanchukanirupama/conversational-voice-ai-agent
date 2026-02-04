@@ -11,12 +11,17 @@ def _save_customers(customers: List[Dict[str, Any]]):
     with open(settings.CUSTOMERS_FILE, 'w') as f:
         json.dump(customers, f, indent=2)
 
-def verify_identity(customer_id: str, pin: str) -> bool:
-    """Verifies customer identity check."""
+def verify_identity(customer_id: str | None = None, account_number: str | None = None, phone: str | None = None, pin: str = "") -> bool:
+    """Verifies customer identity check via ID, Account Number, or Phone."""
     customers = _load_customers()
     for cust in customers:
-        if cust['customer_id'] == customer_id and cust['pin'] == pin:
-            return True
+        # Check matches if provided
+        id_match = (customer_id and cust['customer_id'] == customer_id)
+        acc_match = (account_number and cust.get('account_number') == account_number)
+        phone_match = (phone and cust['profile']['phone'] == phone)
+        
+        if (id_match or acc_match or phone_match) and cust['pin'] == pin:
+            return f"Identity Verified successfully. Customer ID: {cust['customer_id']}"
     return False
 
 def get_recent_transactions(customer_id: str, count: int | None = None) -> List[Dict[str, Any]]:
