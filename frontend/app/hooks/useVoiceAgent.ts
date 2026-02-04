@@ -1,0 +1,233 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useAudioRecorder } from './useAudioRecorder';
+import { getAudioContext, playRingingTone, stopRingingTone, playDisconnectTone, decodeBase64Audio } from '../utils/audio';
+import { RingingNodes, WSMessage } from '../types';
+
+export function useVoiceAgent() {
+    const [isCallActive, setIsCallActive] = useState(false);
+    const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
+    const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
+    const [transcript, setTranscript] = useState<string[]>([]);
+    const [audioLevel, setAudioLevel] = useState(0);
+
+    const ws = useRef<WebSocket | null>(null);
+    const audioContext = useRef<AudioContext | null>(null);
+    const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
+    const analyserRef = useRef<AnalyserNode | null>(null);
+    const animationFrameRef = useRef<number | null>(null);
+    const shouldDisconnectRef = useRef(false);
+    const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const ringingNodesRef = useRef<RingingNodes | null>(null);
+    const hasGreetingPlayedRef = useRef(false);
+
+
+    const startIdleTimer = useCallback(() => {
+        if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = setTimeout(() => {
+            console.log('Idle timeout triggered');
+            if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+                ws.current.send(JSON.stringify({ type: 'timeout' }));
+            }
+        }, 8000);
+    }, []);
+
+    const stopIdleTimer = useCallback(() => {
+        if (idleTimerRef.current) {
+            clearTimeout(idleTimerRef.current);
+            idleTimerRef.current = null;
+        }
+    }, []);
+
+    const handleCallEnded = useCallback(() => {
+        if (audioContext.current) playDisconnectTone(audioContext.current);
+        
+        setIsCallActive(false);
+        setTranscript([]);
+        hasGreetingPlayedRef.current = false;
+        shouldDisconnectRef.current = false;
+        setIsAgentSpeaking(false);
+        setIsWaitingForResponse(false);
+        setAudioLevel(0);
+    }, []);
+
+    const stopAudioPlayback = useCallback(() => {
+        if (sourceNodeRef.current) {
+            sourceNodeRef.current.onended = null;
+            try {
+                sourceNodeRef.current.stop();
+                sourceNodeRef.current = null;
+                setIsAgentSpeaking(false);
+                stopIdleTimer();
+                if (animationFrameRef.current) {
+                    cancelAnimationFrame(animationFrameRef.current);
+                    setAudioLevel(0);
+                }
+            } catch (e) { console.error(e) }
+        }
+    }, [stopIdleTimer]);
+
+    // -- Audio & Recorder Hooks --
+
+    const { isRecording, startRecording, stopRecording } = useAudioRecorder({
+        isAgentSpeaking,
+        isWaitingForResponse,
+        onAudioAvailable: (blob) => {
+            setIsWaitingForResponse(true);
+            stopIdleTimer();
+
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = () => {
+                const base64data = reader.result as string;
+                if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+                    ws.current.send(JSON.stringify({ type: 'audio', data: base64data }));
+                    setTranscript((prev) => [...prev, 'You: ...']); 
+                } else {
+                    setIsWaitingForResponse(false);
+                }
+            };
+        },
+        onSpeechStart: () => {
+            console.log('Speech detected - Interrupting Agent');
+            stopAudioPlayback();
+            stopIdleTimer();
+        },
+    });
+
+    const playAudio = async (base64Audio: string) => {
+        try {
+            stopAudioPlayback(); // Stop any previous
+            stopIdleTimer();
+
+            if (!audioContext.current) audioContext.current = getAudioContext();
+            
+            const audioBuffer = await decodeBase64Audio(audioContext.current, base64Audio);
+            const source = audioContext.current.createBufferSource();
+            source.buffer = audioBuffer;
+
+            // Analyser setup
+            if (!analyserRef.current) {
+                analyserRef.current = audioContext.current.createAnalyser();
+                analyserRef.current.fftSize = 256;
+            }
+            
+            source.connect(analyserRef.current);
+            analyserRef.current.connect(audioContext.current.destination);
+            
+            source.start(0);
+            sourceNodeRef.current = source;
+            setIsAgentSpeaking(true);
+
+            // Visualizer loop
+            const updateAudioLevel = () => {
+                if (analyserRef.current) {
+                    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+                    analyserRef.current.getByteFrequencyData(dataArray);
+                    const avg = dataArray.reduce((a,b) => a+b) / dataArray.length;
+                    setAudioLevel(avg / 128);
+                    animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
+                }
+            };
+            updateAudioLevel();
+
+            source.onended = () => {
+                setIsAgentSpeaking(false);
+                sourceNodeRef.current = null;
+                if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+                setAudioLevel(0);
+                
+                // Finished speaking -> Start Listening/Idle
+                startIdleTimer();
+                
+                if (!isRecording) {
+                    startRecording();
+                    hasGreetingPlayedRef.current = true;
+                }
+                
+                if (shouldDisconnectRef.current) {
+                    handleCallEnded();
+                }
+            };
+
+        } catch (e) {
+            console.error('Audio playback error:', e);
+            stopRingingTone(ringingNodesRef.current);
+            setIsAgentSpeaking(false);
+            startIdleTimer();
+        }
+    };
+
+    // -- Main Actions --
+
+    const startCall = useCallback(() => {
+        setIsCallActive(true);
+        shouldDisconnectRef.current = false;
+        hasGreetingPlayedRef.current = false;
+        
+        if (!audioContext.current) audioContext.current = getAudioContext();
+        
+        // Start Ringing
+        stopRingingTone(ringingNodesRef.current);
+        ringingNodesRef.current = playRingingTone(audioContext.current);
+
+        // WS Connect
+        const wsUrl = `ws://${window.location.hostname}:8000/ws`;
+        ws.current = new WebSocket(wsUrl);
+
+        ws.current.onopen = () => {
+            console.log('WS Connected');
+        };
+
+        ws.current.onmessage = (event) => {
+            const data: WSMessage = JSON.parse(event.data);
+            if (data.type === 'audio') {
+                stopRingingTone(ringingNodesRef.current);
+                ringingNodesRef.current = null;
+                setIsWaitingForResponse(false);
+                
+                if (data.content) {
+                    setTranscript((prev) => [...prev, `Agent: ${data.content}`]);
+                }
+                if (data.audio) {
+                    playAudio(data.audio);
+                } else {
+                    startIdleTimer();
+                }
+            }
+        };
+
+        ws.current.onclose = () => {
+            console.log('WS Disconnected');
+            stopRingingTone(ringingNodesRef.current);
+            ringingNodesRef.current = null;
+            setIsWaitingForResponse(false);
+            stopRecording();
+            stopIdleTimer();
+
+            if (sourceNodeRef.current) {
+                console.log('Audio still playing, waiting to disconnect UI...');
+                shouldDisconnectRef.current = true;
+            } else {
+                handleCallEnded();
+            }
+        };
+    }, [startIdleTimer, handleCallEnded, stopRecording, startRecording, isRecording]);
+
+    const endCall = useCallback(() => {
+        if (ws.current) ws.current.close();
+        stopAudioPlayback();
+        stopRecording();
+        // UI reset happens in ws.onclose -> handleCallEnded
+    }, [stopAudioPlayback, stopRecording]);
+
+
+    return {
+        isCallActive,
+        isAgentSpeaking,
+        isWaitingForResponse,
+        transcript,
+        audioLevel,
+        startCall,
+        endCall
+    };
+}
