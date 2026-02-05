@@ -56,6 +56,15 @@ def t_block_card(customer_id: str) -> str:
 
 
 @tool
+def t_update_address(customer_id: str, new_address: str) -> str:
+    """Updates the customer's address in their profile. 
+    Use this when customer wants to change their mailing address.
+    Requires customer_id (you will have this after verification) and the new address."""
+    from backend.tools import update_address
+    return update_address(customer_id, new_address)
+
+
+@tool
 def t_end_call() -> str:
     """Terminates the call. ONLY use this if the user explicitly says goodbye or asks to hang up."""
     return "Call terminated."

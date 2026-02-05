@@ -32,5 +32,149 @@
         "phone": "+15550102",
         "address": "456 Oak Ave, Somecity, USA"
     }
+  },
+  {
+    "customer_id": "0003",
+    "account_number": "1003",
+    "pin": "9012",
+    "name": "Carol Williams",
+    "account_balance": 7850.75,
+    "card_id": "3210",
+    "card_status": "active",
+    "recent_transactions": [
+      {"date": "2023-10-27", "amount": -200.00, "description": "Amazon Purchase"},
+      {"date": "2023-10-26", "amount": -75.50, "description": "Restaurant"},
+      {"date": "2023-10-25", "amount": 3000.00, "description": "Salary Deposit"}
+    ],
+    "profile": {
+        "phone": "+15550103",
+        "address": "789 Pine Rd, Springfield, USA"
+    }
+  },
+  {
+    "customer_id": "0004",
+    "account_number": "1004",
+    "pin": "3456",
+    "name": "David Brown",
+    "account_balance": 15200.00,
+    "card_id": "6543",
+    "card_status": "active",
+    "recent_transactions": [
+      {"date": "2023-10-27", "amount": -500.00, "description": "Car Payment"},
+      {"date": "2023-10-26", "amount": -150.00, "description": "Gas Station"},
+      {"date": "2023-10-23", "amount": 5000.00, "description": "Business Income"}
+    ],
+    "profile": {
+        "phone": "+15550104",
+        "address": "321 Elm St, Riverside, USA"
+    }
+  },
+  {
+    "customer_id": "0005",
+    "account_number": "1005",
+    "pin": "7890",
+    "name": "Emma Davis",
+    "account_balance": 1250.30,
+    "card_id": "8765",
+    "card_status": "active",
+    "recent_transactions": [
+      {"date": "2023-10-27", "amount": -35.00, "description": "Pharmacy"},
+      {"date": "2023-10-26", "amount": -80.00, "description": "Clothing Store"},
+      {"date": "2023-10-24", "amount": 1500.00, "description": "Paycheck"}
+    ],
+    "profile": {
+        "phone": "+15550105",
+        "address": "555 Maple Dr, Lakeside, USA"
+    }
+  },
+  {
+    "customer_id": "0006",
+    "account_number": "1006",
+    "pin": "2468",
+    "name": "Frank Miller",
+    "account_balance": 890.60,
+    "card_id": "1357",
+    "card_status": "active",
+    "recent_transactions": [
+      {"date": "2023-10-27", "amount": -45.00, "description": "Uber Ride"},
+      {"date": "2023-10-25", "amount": -120.00, "description": "Internet Bill"},
+      {"date": "2023-10-22", "amount": 1200.00, "description": "Freelance Payment"}
+    ],
+    "profile": {
+        "phone": "+15550106",
+        "address": "888 Birch Ln, Hilltown, USA"
+    }
+  },
+  {
+    "customer_id": "0007",
+    "account_number": "1007",
+    "pin": "1357",
+    "name": "Grace Taylor",
+    "account_balance": 4320.90,
+    "card_id": "9753",
+    "card_status": "active",
+    "recent_transactions": [
+      {"date": "2023-10-27", "amount": -90.00, "description": "Salon"},
+      {"date": "2023-10-26", "amount": -250.00, "description": "Dentist"},
+      {"date": "2023-10-25", "amount": 2500.00, "description": "Paycheck"}
+    ],
+    "profile": {
+        "phone": "+15550107",
+        "address": "999 Cedar Ct, Mountainview, USA"
+    }
+  },
+  {
+    "customer_id": "0008",
+    "account_number": "1008",
+    "pin": "8024",
+    "name": "Henry Anderson",
+    "account_balance": 320.15,
+    "card_id": "2468",
+    "card_status": "blocked",
+    "recent_transactions": [
+      {"date": "2023-10-27", "amount": -25.00, "description": "Fast Food"},
+      {"date": "2023-10-26", "amount": -60.00, "description": "Gas Station"}
+    ],
+    "profile": {
+        "phone": "+15550108",
+        "address": "111 Willow Way, Parkdale, USA"
+    }
+  },
+  {
+    "customer_id": "0009",
+    "account_number": "1009",
+    "pin": "5791",
+    "name": "Iris Martinez",
+    "account_balance": 9875.40,
+    "card_id": "1111",
+    "card_status": "active",
+    "recent_transactions": [
+      {"date": "2023-10-27", "amount": -300.00, "description": "Rent Payment"},
+      {"date": "2023-10-26", "amount": -125.00, "description": "Utilities"},
+      {"date": "2023-10-24", "amount": 4000.00, "description": "Salary Deposit"}
+    ],
+    "profile": {
+        "phone": "+15550109",
+        "address": "222 Spruce St, Beachside, USA"
+    }
+  },
+  {
+    "customer_id": "0010",
+    "account_number": "1010",
+    "pin": "6420",
+    "name": "Jack Thompson",
+    "account_balance": 18500.00,
+    "card_id": "2222",
+    "card_status": "active",
+    "recent_transactions": [
+      {"date": "2023-10-27", "amount": -1200.00, "description": "Mortgage Payment"},
+      {"date": "2023-10-26", "amount": -85.00, "description": "Grocery Store"},
+      {"date": "2023-10-25", "amount": -45.00, "description": "Streaming Services"},
+      {"date": "2023-10-23", "amount": 6000.00, "description": "Salary Deposit"}
+    ],
+    "profile": {
+        "phone": "+15550110",
+        "address": "333 Ash Blvd, Valleytown, USA"
+    }
   }
 ]

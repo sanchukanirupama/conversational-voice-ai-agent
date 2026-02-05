@@ -88,11 +88,22 @@ def get_account_balance(customer_id: str) -> float:
     return customer.get('balance', 0.0) if customer else 0.0
 
 
+
+def update_address(customer_id: str, new_address: str) -> str:
+    """Updates customer's address in their profile."""
+    from backend.db.database import update_customer_address
+    success = update_customer_address(customer_id, new_address)
+    if success:
+        return f"Address updated successfully to: {new_address}"
+    return "Failed to update address. Please try again."
+
+
 # Re-export for backward compatibility
 __all__ = [
     'verify_identity',
     'get_recent_transactions',
     'block_card',
     'get_account_balance',
-    'get_customer_by_id'
+    'get_customer_by_id',
+    'update_address'
 ]

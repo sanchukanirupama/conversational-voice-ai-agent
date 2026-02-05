@@ -281,7 +281,8 @@ class FlowExecutor:
                         f"\n{strategy_desc}\n" if strategy_desc else "\n"
                         "\nYour instructions:"
                     )
-                    for instruction in instructions_list[:10]:
+                    # Increased from 10 to 20 to avoid truncating critical tool usage instructions
+                    for instruction in instructions_list[:20]:
                         flow_specific_instructions += f"\n- {instruction}"
                     
                     edge_cases = flow_instructions_data.get("edge_cases", [])
@@ -298,7 +299,7 @@ class FlowExecutor:
                         f"\n\n[FLOW: {flow.upper().replace('_', ' ')} - VERIFICATION REQUIRED]"
                         "\n\nVerification steps:"
                     )
-                    for instruction in instructions_list[:8]:
+                    for instruction in instructions_list[:10]:
                         flow_specific_instructions += f"\n- {instruction}"
         
         # If we have interaction pattern (for escalation flows), use that
