@@ -11,18 +11,23 @@ from backend.agent.tools_registry import TOOL_REGISTRY, t_verify_identity, t_end
 
 class FlowConfig:
     """
-    Manages flow configurations loaded from prompts.json.
+    Manages flow configurations loaded from unified_configuration.json.
     
     Responsibilities:
     - Load and parse flow definitions
     - Map tool names to tool objects
     - Identify flows requiring verification
+    - Provide access to flow instructions and conversation strategies
+    - Manage escalation logic and verification prompts
     """
     
     def __init__(self):
-        self.routing_flows = settings.PROMPTS.get("routing_flows", {})
+        self.config = settings.PROMPTS
+        self.routing_flows = self.config.get("routing_flows", {})
         self.flow_tools = self._build_flow_tools()
         self.sensitive_flows = self._build_sensitive_flows()
+        self.verification_prompts = self.config.get("verification_prompts", {})
+        self.escalation_strategies = self.config.get("escalation_strategies", {})
     
     def _build_flow_tools(self) -> Dict[str, List]:
         """
@@ -134,3 +139,124 @@ class FlowConfig:
         ])
         
         return "\n".join(prompt_lines)
+    
+    def get_flow_instructions(self, flow_name: str) -> Dict:
+        """
+        Get detailed flow instructions for a specific flow.
+        
+        Args:
+            flow_name: Name of the flow
+            
+        Returns:
+            Dictionary with flow instructions (pre_verification, post_verification, edge_cases)
+        """
+        flow_data = self.routing_flows.get(flow_name, {})
+        return flow_data.get("flow_instructions", {})
+    
+    def get_conversation_strategy(self, flow_name: str) -> Dict:
+        """
+        Get conversation strategy for a specific flow.
+        
+        Args:
+            flow_name: Name of the flow
+            
+        Returns:
+            Dictionary with strategy info (approach, max_turns, escalation_triggers)
+        """
+        flow_data = self.routing_flows.get(flow_name, {})
+        return flow_data.get("conversation_strategy", {})
+    
+    def is_deep_flow(self, flow_name: str) -> bool:
+        """
+        Automatically determine if a flow is deep/instructive based on its configuration.
+        
+        A flow is considered "deep" if:
+        - It has multiple tools (beyond just verification)
+        - AND/OR has detailed flow_instructions with pre/post verification steps
+        
+        Args:
+            flow_name: Name of the flow
+            
+        Returns:
+            True if flow has tools and detailed instructions (deep/instructive)
+            False if minimal tools/instructions (shallow/escalation)
+        """
+        flow_data = self.routing_flows.get(flow_name, {})
+        
+        # Check if flow has meaningful tools (beyond just t_verify_identity)
+        tools = flow_data.get("tools", [])
+        has_actionable_tools = len([t for t in tools if t != "t_verify_identity"]) > 0
+        
+        # Check if flow has detailed instructions
+        flow_instructions = flow_data.get("flow_instructions", {})
+        has_detailed_instructions = bool(
+            flow_instructions.get("post_verification") or 
+            flow_instructions.get("pre_verification")
+        )
+        
+        # Flow is deep if it has tools to work with OR detailed instructions
+        return has_actionable_tools or has_detailed_instructions
+    
+    def get_max_questions_before_escalation(self, flow_name: str) -> int | None:
+        """
+        Get maximum questions allowed before escalation for shallow flows.
+        
+        Args:
+            flow_name: Name of the flow
+            
+        Returns:
+            Max questions count, or None for unlimited (deep flows)
+        """
+        flow_data = self.routing_flows.get(flow_name, {})
+        return flow_data.get("max_questions_before_escalation")
+    
+    def get_escalation_message(self, flow_name: str) -> str:
+        """
+        Get the appropriate escalation message for a flow.
+        
+        Args:
+            flow_name: Name of the flow
+            
+        Returns:
+            Escalation message string
+        """
+        # First check flow-specific instructions
+        flow_data = self.routing_flows.get(flow_name, {})
+        flow_instructions = flow_data.get("flow_instructions", {})
+        if "escalation_message" in flow_instructions:
+            return flow_instructions["escalation_message"]
+        
+        # Check escalation_message_templates for flow-specific messages
+        templates = self.escalation_strategies.get("escalation_message_templates", {})
+        if flow_name in templates:
+            return templates[flow_name]
+        
+        # Default escalation message based on flow type
+        if self.is_deep_flow(flow_name):
+            return self.escalation_strategies.get(
+                "deep_flows_default_message",
+                "Let me connect you to one of our specialists who can assist you further."
+            )
+        else:
+            return self.escalation_strategies.get(
+                "shallow_flows_default_message", 
+                "Let me connect you to a specialist who can help you with this."
+            )
+    
+    def get_verification_prompt(self, prompt_type: str = "initial_request") -> str:
+        """
+        Get verification prompt message.
+        
+        Args:
+            prompt_type: Type of verification prompt (initial_request, success_message, failure_message, alternative_method)
+            
+        Returns:
+            Verification prompt string
+        """
+        default_prompts = {
+            "initial_request": "For your security, I'll need to verify your identity. May I have your Account Number and PIN?",
+            "success_message": "Thank you! Your identity has been verified successfully.",
+            "failure_message": "I'm sorry, but I couldn't verify your identity. Please try again.",
+            "alternative_method": "You can also provide your Phone Number for verification."
+        }
+        return self.verification_prompts.get(prompt_type, default_prompts.get(prompt_type, ""))

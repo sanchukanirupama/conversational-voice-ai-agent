@@ -227,7 +227,19 @@ class FlowExecutor:
         return {"messages": [response], "is_call_over": is_call_over}
     
     def _build_system_message(self, flow: str, is_verified: bool, customer_id: str) -> str:
-        """Build context-aware system prompt."""
+        """Build context-aware system prompt using unified configuration."""
+        
+        # Get flow-specific data
+        flow_instructions_data = self.flow_config.get_flow_instructions(flow)
+        conversation_strategy = self.flow_config.get_conversation_strategy(flow)
+        
+        # Automatically determine if this is a deep flow based on tools and instructions
+        has_detailed_instructions = bool(
+            flow_instructions_data.get("post_verification") or 
+            flow_instructions_data.get("pre_verification")
+        )
+        
+        # Base components
         workaround_instruction = (
             "\n\nIMPORTANT VERIFICATION NOTE: "
             "Can't hear 'Customer ID' well? Ask for 'Account Number' (4 digits) or 'Phone Number' instead. "
@@ -255,33 +267,79 @@ class FlowExecutor:
             "If you have completed a task (like verification), ask the user what else they need."
         )
         
-        # Flow-specific strict instructions
-        flow_instructions = ""
-        if flow == "card_atm_issues":
-            flow_instructions = (
-                "\n\n[FLOW: CARD/ATM ISSUES - STRICT MODE]"
-                "\nYou are handling CARD AND ATM PROBLEMS ONLY."
-                "\n- Focus on: card blocking, lost/stolen cards, ATM issues, card decline"
-                "\n- Do NOT handle: balance inquiries, transaction history (redirect to account servicing)"
-                "\n- When user wants to block card after verification: Call t_block_card immediately"
-                f"\n- You have customer_id: {customer_id if is_verified else 'PENDING VERIFICATION'}"
-                "\n- Tool usage: t_block_card(customer_id='{customer_id}') - NO need for card_id, system finds it automatically"
-                if is_verified else
-                "\n\n[FLOW: CARD/ATM ISSUES - VERIFICATION REQUIRED]"
-                "\nUser is reporting a card/ATM problem. This is URGENT for security."
-                "\nYou MUST verify identity first before blocking card."
-                "\nAsk for Account Number and PIN to proceed."
-            )
-        elif flow == "account_servicing":
-            flow_instructions = (
-                "\n\n[FLOW: ACCOUNT SERVICING - STRICT MODE]"
-                "\nYou are handling ACCOUNT INFORMATION ONLY."
-                "\n- Focus on: balance, transactions, statements, profile updates"
-                "\n- Do NOT handle: card blocking, ATM issues, lost/stolen cards"
-                "\n- If user mentions card blocking, inform them you'll need to switch to card services"
-            )
+        # Build flow-specific instructions based on what's actually defined in config
+        flow_specific_instructions = ""
         
-        return f"{self.base_persona}\n\nCurrent Flow: {flow}\n{workaround_instruction}{strict_rule}{termination_safety}{flow_instructions}{permission_note}"
+        # If we have detailed instructions, use them
+        if has_detailed_instructions:
+            if is_verified:
+                instructions_list = flow_instructions_data.get("post_verification", [])
+                if instructions_list:
+                    strategy_desc = conversation_strategy.get('description', '')
+                    flow_specific_instructions = (
+                        f"\n\n[FLOW: {flow.upper().replace('_', ' ')}]"
+                        f"\n{strategy_desc}\n" if strategy_desc else "\n"
+                        "\nYour instructions:"
+                    )
+                    for instruction in instructions_list[:10]:
+                        flow_specific_instructions += f"\n- {instruction}"
+                    
+                    edge_cases = flow_instructions_data.get("edge_cases", [])
+                    if edge_cases:
+                        flow_specific_instructions += "\n\nEdge Cases:"
+                        for case in edge_cases[:5]:
+                            flow_specific_instructions += f"\n- {case}"
+                    
+                    flow_specific_instructions += f"\n\nYou have customer_id: {customer_id}"
+            else:
+                instructions_list = flow_instructions_data.get("pre_verification", [])
+                if instructions_list:
+                    flow_specific_instructions = (
+                        f"\n\n[FLOW: {flow.upper().replace('_', ' ')} - VERIFICATION REQUIRED]"
+                        "\n\nVerification steps:"
+                    )
+                    for instruction in instructions_list[:8]:
+                        flow_specific_instructions += f"\n- {instruction}"
+        
+        # If we have interaction pattern (for escalation flows), use that
+        elif flow_instructions_data.get("interaction_pattern"):
+            interaction_pattern = flow_instructions_data.get("interaction_pattern", [])
+            max_questions = self.flow_config.get_max_questions_before_escalation(flow)
+            escalation_msg = self.flow_config.get_escalation_message(flow)
+            strategy_desc = conversation_strategy.get('description', '')
+            
+            # Build VERY STRICT escalation instructions
+            flow_specific_instructions = (
+                f"\n\n[FLOW: {flow.upper().replace('_', ' ')} - ESCALATION REQUIRED]"
+            )
+            
+            if strategy_desc:
+                flow_specific_instructions += f"\n{strategy_desc}"
+            
+            if max_questions:
+                flow_specific_instructions += (
+                    f"\n\n🚨 HARD LIMIT: You may ask MAXIMUM {max_questions} question(s), then you MUST escalate."
+                    f"\n🚨 STRICT PROHIBITION: Do NOT provide solutions, troubleshooting steps, or detailed instructions."
+                    f"\n🚨 YOUR ONLY JOB: Gather basic context ({max_questions} question max), then transfer to specialist."
+                )
+            
+            flow_specific_instructions += "\n\nYour exact approach:"
+            
+            for pattern in interaction_pattern:
+                # Highlight STRICT RULES prominently
+                if pattern.startswith("STRICT RULE") or pattern.startswith("IMMEDIATE"):
+                    flow_specific_instructions += f"\n🚨 {pattern}"
+                else:
+                    flow_specific_instructions += f"\n- {pattern}"
+            
+            if escalation_msg:
+                flow_specific_instructions += (
+                    f"\n\n✅ After {max_questions or 2} question(s), you MUST say:"
+                    f"\n\"{escalation_msg}\""
+                )
+        
+        
+        return f"{self.base_persona}\n\nCurrent Flow: {flow}\n{workaround_instruction}{strict_rule}{termination_safety}{flow_specific_instructions}{permission_note}"
     
     def _check_termination(self, response) -> bool:
         """Check if call should end based on tool calls."""

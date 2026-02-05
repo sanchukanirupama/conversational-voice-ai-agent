@@ -21,7 +21,7 @@ class Config:
     # LLM / Agent
     LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o")
     LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0"))
-    PROMPTS_FILE = os.getenv("PROMPTS_FILE", "backend/data/prompts.json")
+    PROMPTS_FILE = os.getenv("PROMPTS_FILE", "backend/data/unified_configuration.json")
 
     # Audio - STT
     STT_MODEL = os.getenv("STT_MODEL", "whisper-1")
@@ -38,13 +38,38 @@ class Config:
     DEFAULT_TRANSACTION_COUNT = int(os.getenv("DEFAULT_TRANSACTION_COUNT", "3"))
 
     def load_prompts(self):
+        """
+        Load unified configuration with all prompts, flows, tools, and strategies.
+        Provides backward-compatible access to prompts while adding new sections.
+        """
         import json
         try:
             with open(self.PROMPTS_FILE, 'r') as f:
-                return json.load(f)
+                config = json.load(f)
+                
+                # For backward compatibility, return the full config
+                # Code can access: settings.PROMPTS["system_persona"], etc.
+                return config
+        except FileNotFoundError:
+            print(f"Configuration file not found: {self.PROMPTS_FILE}")
+            print("Falling back to minimal default configuration")
+            return self._get_default_config()
+        except json.JSONDecodeError as e:
+            print(f"Error parsing configuration JSON: {e}")
+            return self._get_default_config()
         except Exception as e:
-            print(f"Error loading prompts: {e}")
-            return {}
+            print(f"Unexpected error loading configuration: {e}")
+            return self._get_default_config()
+    
+    def _get_default_config(self):
+        """Fallback configuration if file loading fails"""
+        return {
+            "system_persona": "You are a banking assistant.",
+            "greeting": "Welcome to Bank ABC. How can I help you?",
+            "routing_flows": {},
+            "tool_registry": {},
+            "escalation_strategies": {}
+        }
 
 settings = Config()
 settings.PROMPTS = settings.load_prompts()
