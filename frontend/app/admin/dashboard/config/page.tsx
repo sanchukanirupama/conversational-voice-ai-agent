@@ -158,13 +158,13 @@ export default function ConfigEditorPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-white">Configuration Editor</h1>
-          <p className="text-white/60 mt-1">Manage AI agent behavior and flow settings</p>
+          <p className="text-white/50 mt-1">Manage AI agent behavior and flow settings</p>
         </div>
         <div className="flex gap-3">
           <button
             onClick={fetchConfig}
             disabled={isLoading}
-            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white rounded-xl transition-all disabled:opacity-50"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
@@ -172,7 +172,7 @@ export default function ConfigEditorPage() {
           <button
             onClick={saveConfig}
             disabled={isSaving}
-            className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg transition-all disabled:opacity-50 shadow-lg"
+            className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl transition-all disabled:opacity-50 shadow-lg shadow-emerald-500/20"
           >
             <Save className="w-4 h-4" />
             {isSaving ? 'Saving...' : 'Save Changes'}
@@ -182,10 +182,10 @@ export default function ConfigEditorPage() {
 
       {/* Message */}
       {message && (
-        <div className={`mb-6 p-4 rounded-lg ${
-          message.type === 'success' 
-            ? 'bg-green-500/10 border border-green-500/50 text-green-400' 
-            : 'bg-red-500/10 border border-red-500/50 text-red-400'
+        <div className={`mb-6 p-4 rounded-xl ${
+          message.type === 'success'
+            ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+            : 'bg-red-500/10 border border-red-500/30 text-red-400'
         }`}>
           {message.text}
         </div>
@@ -197,8 +197,8 @@ export default function ConfigEditorPage() {
           onClick={() => setActiveTab('forms')}
           className={`px-6 py-3 font-medium transition-all ${
             activeTab === 'forms'
-              ? 'text-white border-b-2 border-blue-500'
-              : 'text-white/60 hover:text-white'
+              ? 'text-white border-b-2 border-emerald-500'
+              : 'text-white/50 hover:text-white/80'
           }`}
         >
           Detailed Forms
@@ -207,8 +207,8 @@ export default function ConfigEditorPage() {
           onClick={() => setActiveTab('json')}
           className={`px-6 py-3 font-medium transition-all ${
             activeTab === 'json'
-              ? 'text-white border-b-2 border-blue-500'
-              : 'text-white/60 hover:text-white'
+              ? 'text-white border-b-2 border-emerald-500'
+              : 'text-white/50 hover:text-white/80'
           }`}
         >
           Advanced JSON Editor

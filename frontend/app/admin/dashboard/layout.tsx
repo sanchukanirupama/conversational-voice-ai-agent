@@ -37,30 +37,39 @@ export default function AdminDashboardLayout({
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#0A0A0A] flex">
+    <div className="min-h-screen w-full bg-black flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-black/40 backdrop-blur-xl border-r border-white/10 flex flex-col">
+      <aside className="w-64 bg-neutral-950 border-r border-white/10 flex flex-col">
         {/* Logo/Header */}
         <div className="p-6 border-b border-white/10">
-          <h1 className="text-xl font-bold text-white">Admin Dashboard</h1>
-          <p className="text-xs text-white/50 mt-1">Bank ABC Voice AI</p>
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-white">Dashboard</h1>
+              <p className="text-xs text-white/40">ABC Bank AI</p>
+            </div>
+          </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2">
-          <Link 
+        <nav className="flex-1 p-4 space-y-1">
+          <Link
             href="/admin/dashboard/config"
-            className="flex items-center gap-3 px-4 py-3 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all group"
+            className="flex items-center gap-3 px-4 py-3 text-white/60 hover:text-white hover:bg-emerald-500/10 hover:border-emerald-500/20 border border-transparent rounded-xl transition-all group"
           >
-            <Settings className="w-5 h-5" />
+            <Settings className="w-5 h-5 group-hover:text-emerald-400 transition-colors" />
             <span className="font-medium">Configuration</span>
           </Link>
-          
-          <Link 
+
+          <Link
             href="/admin/dashboard/calls"
-            className="flex items-center gap-3 px-4 py-3 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all group"
+            className="flex items-center gap-3 px-4 py-3 text-white/60 hover:text-white hover:bg-emerald-500/10 hover:border-emerald-500/20 border border-transparent rounded-xl transition-all group"
           >
-            <Activity className="w-5 h-5" />
+            <Activity className="w-5 h-5 group-hover:text-emerald-400 transition-colors" />
             <span className="font-medium">Live Calls</span>
           </Link>
         </nav>
@@ -69,7 +78,7 @@ export default function AdminDashboardLayout({
         <div className="p-4 border-t border-white/10">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-4 py-3 text-white/70 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+            className="flex items-center gap-3 w-full px-4 py-3 text-white/60 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 rounded-xl transition-all"
           >
             <LogOut className="w-5 h-5" />
             <span className="font-medium">Logout</span>
@@ -78,7 +87,7 @@ export default function AdminDashboardLayout({
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto bg-black">
         {children}
       </main>
     </div>

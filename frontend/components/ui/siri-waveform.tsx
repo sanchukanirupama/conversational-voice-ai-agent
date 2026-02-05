@@ -19,12 +19,12 @@ export function SiriWaveform({ audioLevel }: SiriWaveformProps) {
         let animationFrameId: number;
         let phase = 0;
         
-        // Configuration for the waves
+        // Configuration for the waves - Emerald/Teal theme
         const waves = [
-            { color: "rgba(255, 0, 0, 0.5)", speed: 0.01, amplitude: 0.5 },    // Reddish
-            { color: "rgba(0, 255, 255, 0.5)", speed: 0.02, amplitude: 0.8 },  // Cyan
-            { color: "rgba(0, 0, 255, 0.5)", speed: 0.015, amplitude: 0.6 },   // Blue
-            { color: "rgba(255, 0, 255, 0.4)", speed: 0.03, amplitude: 0.4 },  // Magenta
+            { color: "rgba(16, 185, 129, 0.7)", speed: 0.01, amplitude: 0.5 },   // Emerald
+            { color: "rgba(20, 184, 166, 0.6)", speed: 0.02, amplitude: 0.8 },   // Teal
+            { color: "rgba(52, 211, 153, 0.5)", speed: 0.015, amplitude: 0.6 },  // Light emerald
+            { color: "rgba(94, 234, 212, 0.4)", speed: 0.03, amplitude: 0.4 },   // Light teal
         ];
 
         const render = () => {

@@ -78,21 +78,21 @@ export default function LiveCallsPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-white">Live Call Monitoring</h1>
-          <p className="text-white/60 mt-1">Real-time active call tracking</p>
+          <p className="text-white/50 mt-1">Real-time active call tracking</p>
         </div>
         <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-white/80 text-sm">
+          <label className="flex items-center gap-2 text-white/70 text-sm">
             <input
               type="checkbox"
               checked={autoRefresh}
               onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="w-4 h-4"
+              className="w-4 h-4 accent-emerald-500"
             />
             Auto-refresh (3s)
           </label>
           <button
             onClick={fetchCalls}
-            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all"
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white rounded-xl transition-all"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
@@ -102,15 +102,15 @@ export default function LiveCallsPage() {
 
       {/* Error Message */}
       {error && (
-        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400">
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400">
           {error}
         </div>
       )}
 
       {/* Active Calls Count */}
       <div className="mb-6">
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/30 rounded-lg">
-          <Phone className="w-5 h-5 text-green-400" />
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+          <Phone className="w-5 h-5 text-emerald-400" />
           <span className="text-white font-medium">{calls.length} Active Call{calls.length !== 1 ? 's' : ''}</span>
         </div>
       </div>
