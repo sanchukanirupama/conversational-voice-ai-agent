@@ -248,12 +248,26 @@ class FlowExecutor:
         
         permission_note = ""
         if is_verified:
+            # Get tools available for this flow
+            flow_tools = self.flow_config.get_tools_for_flow(flow)
+            tool_names = [t.name for t in flow_tools if t.name != 't_end_call']
+            
             permission_note = (
                 f"\n\n[SYSTEM UPDATE]: User is VERIFIED (Customer ID: {customer_id}). "
                 "You have permission to disclose account details and perform actions. "
                 f"To check balance, call tool: t_get_balance(customer_id='{customer_id}'). "
                 "Proceed with the user's request immediately."
             )
+            
+            # Add strong tool usage enforcement
+            if tool_names:
+                permission_note += (
+                    f"\n\n🔧 CRITICAL TOOL USAGE RULE: You have these tools available: {', '.join(tool_names)}. "
+                    "If the user's request matches what any of these tools can do, you MUST use the tool. "
+                    "DO NOT escalate to a human agent when you have the tool to solve it yourself. "
+                    "For example, if user wants to block a card and you have t_block_card tool, USE IT IMMEDIATELY. "
+                    "Only escalate if: (1) the tool fails technically, (2) user explicitly asks for human, or (3) you genuinely don't have a tool for the request."
+                )
         
         strict_rule = (
             "\n\nCRITICAL DATA RULE: You DO NOT know any account details (balance, transactions) "
@@ -265,6 +279,13 @@ class FlowExecutor:
             "\n\nTERMINATION RULE: NEVER call t_end_call to finish a task. "
             "Only call t_end_call when the USER explicitly says goodbye or asks to end the call. "
             "If you have completed a task (like verification), ask the user what else they need."
+        )
+        
+        tool_execution_style = (
+            "\n\n🎯 TOOL EXECUTION STYLE: When you need to use a tool, DO NOT announce it. "
+            "Do NOT say 'please hold', 'let me check', 'I'll verify that', or similar phrases. "
+            "Simply call the tool silently and report the RESULT. "
+            "Example: Instead of 'Let me block your card...' → Just call t_block_card and say 'Your card has been blocked successfully.'"
         )
         
         # Build flow-specific instructions based on what's actually defined in config
@@ -281,7 +302,6 @@ class FlowExecutor:
                         f"\n{strategy_desc}\n" if strategy_desc else "\n"
                         "\nYour instructions:"
                     )
-                    # Increased from 10 to 20 to avoid truncating critical tool usage instructions
                     for instruction in instructions_list[:20]:
                         flow_specific_instructions += f"\n- {instruction}"
                     
@@ -340,7 +360,8 @@ class FlowExecutor:
                 )
         
         
-        return f"{self.base_persona}\n\nCurrent Flow: {flow}\n{workaround_instruction}{strict_rule}{termination_safety}{flow_specific_instructions}{permission_note}"
+        return f"{self.base_persona}\n\nCurrent Flow: {flow}\n{workaround_instruction}{strict_rule}{tool_execution_style}{termination_safety}{flow_specific_instructions}{permission_note}"
+
     
     def _check_termination(self, response) -> bool:
         """Check if call should end based on tool calls."""

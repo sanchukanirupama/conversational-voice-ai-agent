@@ -8,3 +8,6 @@ python-dotenv
 httpx
 langchain-openai
 openai
+python-jose[cryptography]
+python-multipart
+passlib[bcrypt]

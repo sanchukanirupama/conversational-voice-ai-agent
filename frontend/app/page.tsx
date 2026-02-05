@@ -32,9 +32,6 @@ export default function Home() {
                   <div className="text-gray-500 font-light text-2xl">
                     Tap to talk to your AI assistant
                   </div>
-                  <div className="text-gray-500 font-light text-xl">
-                    -- ABC Bank --
-                  </div>
                 </div>
             )}
         </div>
@@ -70,6 +67,16 @@ export default function Home() {
                     <span className="absolute -bottom-8 text-xs text-red-400/80 font-mono tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">END</span>
                 </button>
             )}
+        </div>
+        
+        {/* Admin Login Link */}
+        <div className="mt-8">
+            <a 
+                href="/admin/login" 
+                className="text-sm text-white/40 hover:text-white/70 transition-colors duration-200 font-light tracking-wide underline decoration-white/20 hover:decoration-white/50"
+            >
+                Login as an Admin
+            </a>
         </div>
         
     </div>

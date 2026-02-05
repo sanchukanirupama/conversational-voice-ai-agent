@@ -37,6 +37,13 @@ class Config:
     CUSTOMERS_FILE = os.getenv("CUSTOMERS_FILE", "backend/data/customers.json")
     DEFAULT_TRANSACTION_COUNT = int(os.getenv("DEFAULT_TRANSACTION_COUNT", "3"))
 
+    # Admin Authentication
+    ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+    JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-in-production")
+    JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+    JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "480"))
+
     def load_prompts(self):
         """
         Load unified configuration with all prompts, flows, tools, and strategies.
@@ -60,6 +67,10 @@ class Config:
         except Exception as e:
             print(f"Unexpected error loading configuration: {e}")
             return self._get_default_config()
+    
+    def reload_prompts(self):
+        """Reload the prompts configuration from file (for dynamic updates)"""
+        self.PROMPTS = self.load_prompts()
     
     def _get_default_config(self):
         """Fallback configuration if file loading fails"""

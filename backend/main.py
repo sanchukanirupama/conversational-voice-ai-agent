@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
 from backend.services.langsmith_config import init_langsmith
-from backend.routes import websocket
+from backend.routes import websocket, admin
 
 # Initialize Services
 init_langsmith()
@@ -18,6 +18,7 @@ app.add_middleware(
 
 # Include Routes
 app.include_router(websocket.router)
+app.include_router(admin.router)
 
 @app.get("/")
 def home():
