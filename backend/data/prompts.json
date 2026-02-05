@@ -7,16 +7,18 @@
     "card_atm_issues": {
       "id": 1,
       "type": "deep",
-      "description": "Lost or stolen cards, card declined, ATM cash not dispensed.",
+      "description": "CARD PROBLEMS ONLY: Block/freeze card, report lost/stolen card, card declined/not working, ATM card issues, ATM cash not dispensed, damaged card replacement. Keywords: block, freeze, lost, stolen, card declined, ATM problem, card not working.",
       "requires_verification": true,
-      "tools": ["t_verify_identity", "t_block_card"]
+      "tools": ["t_verify_identity", "t_block_card"],
+      "strict_keywords": ["block card", "freeze card", "lost card", "stolen card", "card declined", "atm", "card not working", "deactivate card"]
     },
     "account_servicing": {
       "id": 2,
       "type": "deep",
-      "description": "Balance inquiries, bank statements, transaction history, profile updates.",
+      "description": "ACCOUNT INFORMATION ONLY: Check balance, view transactions, download statements, update profile/contact info, account status inquiry. Does NOT include card blocking or ATM issues. Keywords: balance, transactions, statement, profile, account details.",
       "requires_verification": true,
-      "tools": ["t_verify_identity", "t_get_balance", "t_get_transactions"]
+      "tools": ["t_verify_identity", "t_get_balance", "t_get_transactions"],
+      "strict_keywords": ["balance", "transactions", "statement", "transaction history", "account details"]
     },
     "account_opening": {
       "id": 3,

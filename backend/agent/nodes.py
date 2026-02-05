@@ -20,7 +20,8 @@ class RouterNode:
     """
     Classifies user intent into one of the predefined flows.
     
-    Uses LLM to determine which banking flow the user is requesting.
+    Uses keyword-based pre-classification for high-confidence cases,
+    then falls back to LLM for ambiguous intents.
     Tagged with 'router_classification' for LangSmith tracing.
     """
     
@@ -55,11 +56,25 @@ class RouterNode:
         if not last_human:
             return {"active_flow": "general"}
         
-        # Build prompt and classify
+        # Try keyword-based classification first (for high-confidence cases)
+        keyword_flow = self._classify_by_keywords(last_human.content)
+        if keyword_flow:
+            return {"active_flow": keyword_flow}
+        
+        # Get recent context (last 5 messages or fewer)
+        recent_messages = messages[-5:] if len(messages) > 5 else messages
+        context_messages = [m for m in recent_messages if isinstance(m, HumanMessage)]
+        
+        # Build prompt and classify using LLM
         system_prompt = self.flow_config.build_router_prompt()
         
+        # Use last human message + context hint if available
+        context_hint = ""
+        if len(context_messages) > 1:
+            context_hint = f"\n[Recent context: User previously mentioned topics related to their inquiry]"
+        
         classification = self.llm.invoke(
-            [SystemMessage(content=system_prompt), last_human],
+            [SystemMessage(content=system_prompt + context_hint), last_human],
             config={"tags": ["router_classification"]}
         ).content.strip().lower()
         
@@ -68,6 +83,32 @@ class RouterNode:
             classification = "general"
         
         return {"active_flow": classification}
+    
+    def _classify_by_keywords(self, text: str) -> str | None:
+        """
+        Pre-classify based on strict keywords for high-confidence cases.
+        
+        Args:
+            text: User message text
+            
+        Returns:
+            Flow name if keywords match, None otherwise
+        """
+        text_lower = text.lower()
+        
+        # High-priority card/ATM keywords (security-sensitive)
+        card_keywords = [
+            "block card", "freeze card", "lost card", "stolen card",
+            "block my card", "freeze my card", "lost my card", "stolen my card",
+            "card was stolen", "card is lost", "deactivate card",
+            "card declined", "card not working", "atm"
+        ]
+        
+        for keyword in card_keywords:
+            if keyword in text_lower:
+                return "card_atm_issues"
+        
+        return None
 
 
 class VerificationGate:
@@ -214,7 +255,33 @@ class FlowExecutor:
             "If you have completed a task (like verification), ask the user what else they need."
         )
         
-        return f"{self.base_persona}\n\nCurrent Flow: {flow}\n{workaround_instruction}{strict_rule}{termination_safety}{permission_note}"
+        # Flow-specific strict instructions
+        flow_instructions = ""
+        if flow == "card_atm_issues":
+            flow_instructions = (
+                "\n\n[FLOW: CARD/ATM ISSUES - STRICT MODE]"
+                "\nYou are handling CARD AND ATM PROBLEMS ONLY."
+                "\n- Focus on: card blocking, lost/stolen cards, ATM issues, card decline"
+                "\n- Do NOT handle: balance inquiries, transaction history (redirect to account servicing)"
+                "\n- When user wants to block card after verification: Call t_block_card immediately"
+                f"\n- You have customer_id: {customer_id if is_verified else 'PENDING VERIFICATION'}"
+                "\n- Tool usage: t_block_card(customer_id='{customer_id}') - NO need for card_id, system finds it automatically"
+                if is_verified else
+                "\n\n[FLOW: CARD/ATM ISSUES - VERIFICATION REQUIRED]"
+                "\nUser is reporting a card/ATM problem. This is URGENT for security."
+                "\nYou MUST verify identity first before blocking card."
+                "\nAsk for Account Number and PIN to proceed."
+            )
+        elif flow == "account_servicing":
+            flow_instructions = (
+                "\n\n[FLOW: ACCOUNT SERVICING - STRICT MODE]"
+                "\nYou are handling ACCOUNT INFORMATION ONLY."
+                "\n- Focus on: balance, transactions, statements, profile updates"
+                "\n- Do NOT handle: card blocking, ATM issues, lost/stolen cards"
+                "\n- If user mentions card blocking, inform them you'll need to switch to card services"
+            )
+        
+        return f"{self.base_persona}\n\nCurrent Flow: {flow}\n{workaround_instruction}{strict_rule}{termination_safety}{flow_instructions}{permission_note}"
     
     def _check_termination(self, response) -> bool:
         """Check if call should end based on tool calls."""

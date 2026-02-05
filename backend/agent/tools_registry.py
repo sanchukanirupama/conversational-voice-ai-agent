@@ -35,11 +35,24 @@ def t_get_transactions(customer_id: str) -> str:
 
 
 @tool
-def t_block_card(card_id: str) -> str:
-    """Blocks a card. Requires card_id."""
+def t_block_card(customer_id: str) -> str:
+    """Blocks the customer's active card immediately for security. 
+    Use this when customer reports lost/stolen card or requests card blocking.
+    Requires customer_id (you will have this after verification).
+    The system will automatically find and block the customer's card."""
+    from backend.tools import get_customer_by_id
+    
+    customer = get_customer_by_id(customer_id)
+    if not customer:
+        return "Failed to block card: Customer not found."
+    
+    card_id = customer.get('card_id')
+    if not card_id:
+        return "Failed to block card: No card found for this customer."
+    
     if block_card(card_id):
-        return "Card blocked successfully."
-    return "Failed to block card."
+        return f"Card ending in {card_id[-4:]} has been blocked successfully for security. A replacement card will be mailed within 5-7 business days."
+    return "Failed to block card. Please try again or contact support."
 
 
 @tool

@@ -89,13 +89,21 @@ class FlowConfig:
     
     def build_router_prompt(self) -> str:
         """
-        Dynamically builds the router classification prompt.
+        Dynamically builds the router classification prompt with strict rules and examples.
         
         Returns:
             System prompt string for the router
         """
         prompt_lines = [
-            "You are a banking router. Classify the user's latest intent into exactly one of these categories:"
+            "You are a banking router. Classify the user's intent into EXACTLY ONE category.",
+            "",
+            "=== STRICT CLASSIFICATION RULES ===",
+            "1. CARD/ATM keywords (block, freeze, lost, stolen, ATM, card declined) → card_atm_issues",
+            "2. ACCOUNT INFO keywords (balance, transactions, statement) → account_servicing",
+            "3. If BOTH mentioned, prioritize CARD SAFETY → card_atm_issues",
+            "4. Greeting/unclear → general",
+            "",
+            "=== AVAILABLE FLOWS ==="
         ]
         
         sorted_flows = sorted(
@@ -105,10 +113,24 @@ class FlowConfig:
         
         for i, (key, data) in enumerate(sorted_flows, 1):
             desc = data.get("description", "")
-            prompt_lines.append(f"{i}. {key} ({desc})")
+            keywords = data.get("strict_keywords", [])
+            keyword_str = f" [Keywords: {', '.join(keywords[:3])}...]" if keywords else ""
+            prompt_lines.append(f"{i}. {key}{keyword_str}")
+            prompt_lines.append(f"   {desc}")
         
-        prompt_lines.append(f"{len(sorted_flows)+1}. general (Greeting, other)")
-        prompt_lines.append("\nOutput ONLY the category name. If uncertain or mixed, default to 'general'.")
-        prompt_lines.append("If the user is continuing a previous conversation or answering a question, keep the context in mind.")
+        prompt_lines.append(f"\n{len(sorted_flows)+1}. general (Greeting, chitchat, unclear intent)")
+        
+        prompt_lines.extend([
+            "",
+            "=== EXAMPLES ===",
+            "User: 'I need to block my card' → card_atm_issues",
+            "User: 'My card was stolen' → card_atm_issues",
+            "User: 'What is my balance?' → account_servicing",
+            "User: 'Show my transactions' → account_servicing",
+            "User: 'I lost my card and want to check balance' → card_atm_issues (card safety priority)",
+            "User: 'Hello' → general",
+            "",
+            "Output ONLY the flow name, nothing else."
+        ])
         
         return "\n".join(prompt_lines)

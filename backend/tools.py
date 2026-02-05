@@ -1,64 +1,98 @@
-import json
+"""
+Agent Tools
+
+Tool functions that interact with the database.
+All tools now use SQLite instead of JSON files.
+"""
+
 from typing import Optional, Dict, List, Any
 
-from backend.config import settings
+from backend.db import (
+    verify_customer_credentials,
+    get_customer_by_id,
+    get_transactions_by_customer,
+    update_customer_balance,
+    block_customer_card
+)
 
-def _load_customers() -> List[Dict[str, Any]]:
-    with open(settings.CUSTOMERS_FILE, 'r') as f:
-        return json.load(f)
 
-def _save_customers(customers: List[Dict[str, Any]]):
-    with open(settings.CUSTOMERS_FILE, 'w') as f:
-        json.dump(customers, f, indent=2)
-
-def verify_identity(customer_id: str | None = None, account_number: str | None = None, phone: str | None = None, pin: str = "") -> bool:
-    """Verifies customer identity check via ID, Account Number, or Phone."""
-    customers = _load_customers()
-    for cust in customers:
-        # Check matches if provided
-        id_match = (customer_id and cust['customer_id'] == customer_id)
-        acc_match = (account_number and cust.get('account_number') == account_number)
-        phone_match = (phone and cust['profile']['phone'] == phone)
-        
-        if (id_match or acc_match or phone_match) and cust['pin'] == pin:
-            return f"Identity Verified successfully. Customer ID: {cust['customer_id']}"
+def verify_identity(
+    customer_id: str | None = None, 
+    account_number: str | None = None, 
+    phone: str | None = None, 
+    pin: str = ""
+) -> str | bool:
+    """
+    Verifies customer identity via ID, Account Number, or Phone.
+    
+    Args:
+        customer_id: Customer ID
+        account_number: 4-digit account number
+        phone: Phone number
+        pin: 4-digit PIN
+    
+    Returns:
+        Success message with customer ID if verified, False otherwise
+    """
+    customer = verify_customer_credentials(
+        customer_id=customer_id,
+        account_number=account_number,
+        phone=phone,
+        pin=pin
+    )
+    
+    if customer:
+        return f"Identity Verified successfully. Customer ID: {customer['id']}"
     return False
 
-def get_recent_transactions(customer_id: str, count: int | None = None) -> List[Dict[str, Any]]:
-    """Fetches recent transactions for a customer."""
-    if count is None:
-        count = settings.DEFAULT_TRANSACTION_COUNT
-    customers = _load_customers()
-    for cust in customers:
-        if cust['customer_id'] == customer_id:
-            return cust.get('recent_transactions', [])[:count]
-    return []
+
+def get_recent_transactions(customer_id: str, count: int = 5) -> List[Dict[str, Any]]:
+    """
+    Fetches recent transactions for a customer.
+    
+    Args:
+        customer_id: Customer ID
+        count: Number of transactions to fetch (default: 5)
+    
+    Returns:
+        List of transaction dictionaries
+    """
+    return get_transactions_by_customer(customer_id, limit=count)
+
 
 def block_card(card_id: str, reason: str = "User requested") -> bool:
-    """Blocks a card. Irreversible."""
-    customers = _load_customers()
-    updated = False
-    for cust in customers:
-        if cust.get('card_id') == card_id:
-            cust['card_status'] = 'blocked'
-            updated = True
-            break
-    if updated:
-        _save_customers(customers)
-        return True
-    return False
+    """
+    Blocks a card (irreversible).
+    
+    Args:
+        card_id: Card ID to block
+        reason: Reason for blocking (logged but not stored currently)
+    
+    Returns:
+        True if card was blocked, False otherwise
+    """
+    return block_customer_card(card_id)
+
 
 def get_account_balance(customer_id: str) -> float:
-    """Fetches current account balance."""
-    customers = _load_customers()
-    for cust in customers:
-        if cust['customer_id'] == customer_id:
-            return cust.get('account_balance', 0.0)
-    return 0.0
+    """
+    Fetches current account balance.
+    
+    Args:
+        customer_id: Customer ID
+    
+    Returns:
+        Current balance as float
+    """
+    customer = get_customer_by_id(customer_id)
+    return customer.get('balance', 0.0) if customer else 0.0
 
-def get_customer_by_id(customer_id: str) -> Optional[Dict[str, Any]]:
-    customers = _load_customers()
-    for cust in customers:
-        if cust['customer_id'] == customer_id:
-            return cust
-    return None
+
+# Re-export for backward compatibility
+__all__ = [
+    'verify_identity',
+    'get_recent_transactions',
+    'block_card',
+    'get_account_balance',
+    'get_customer_by_id'
+]

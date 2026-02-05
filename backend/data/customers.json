@@ -1,11 +1,11 @@
 [
   {
-    "customer_id": "cust_001",
+    "customer_id": "0001",
     "account_number": "1001",
     "pin": "1234",
     "name": "Alice Johnson",
     "account_balance": 2500.50,
-    "card_id": "card_9876",
+    "card_id": "9876",
     "card_status": "active",
     "recent_transactions": [
       {"date": "2023-10-25", "amount": -50.00, "description": "Grocery Store"},
@@ -18,12 +18,12 @@
     }
   },
   {
-    "customer_id": "cust_002",
+    "customer_id": "0002",
     "account_number": "1002",
     "pin": "5678",
     "name": "Bob Smith",
     "account_balance": 500.00,
-    "card_id": "card_5432",
+    "card_id": "5432",
     "card_status": "blocked",
     "recent_transactions": [
        {"date": "2023-10-26", "amount": -15.00, "description": "Coffee Shop"}
