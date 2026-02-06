@@ -7,6 +7,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from backend.agent import app_graph, generate_contextual_response
 from backend.config import settings
 from backend.services.audio import generate_audio, transcribe_audio
+from backend.services.langsmith_tracer import tracer
 from langchain_core.messages import HumanMessage, AIMessage
 from backend.routes import admin
 
@@ -27,9 +28,10 @@ async def websocket_endpoint(websocket: WebSocket):
     # Initialize session state (mock)
     session_state = {
         "messages": [],
-        "customer_id": None, 
+        "customer_id": None,
         "is_verified": False,
-        "is_call_over": False
+        "is_call_over": False,
+        "call_id": call_id  # Add call_id for tracing
     }
 
     # Track this call in active calls for admin monitoring
@@ -143,14 +145,19 @@ async def websocket_endpoint(websocket: WebSocket):
             # Invoke Agent
             session_state["messages"].append(HumanMessage(content=user_text))
             
+            # Get tracing config from centralized tracer
+            trace_config = tracer.get_websocket_config(
+                call_id=call_id,
+                customer_id=session_state.get("customer_id"),
+                is_verified=session_state.get("is_verified", False),
+                active_flow=session_state.get("active_flow", "general"),
+                message_count=len(session_state["messages"])
+            )
+
             # Run graph
             final_state = await app_graph.ainvoke(
                 session_state,
-                config={
-                    "run_name": "BankAgentConversation",
-                    "tags": ["voice_agent_websocket"],
-                    "metadata": {"customer_id": session_state.get("customer_id", "unknown")}
-                }
+                config=trace_config
             )
             
             # Get latest response

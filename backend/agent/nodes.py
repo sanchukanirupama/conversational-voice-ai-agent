@@ -11,9 +11,9 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
 
 from backend.config import settings
-from backend.tools import get_customer_by_id
 from backend.agent.state import AgentState
 from backend.agent.config import FlowConfig
+from backend.services.langsmith_tracer import tracer
 
 
 class RouterNode:
@@ -83,9 +83,16 @@ class RouterNode:
         if len(context_messages) > 1:
             context_hint = f"\n[Recent context: User previously mentioned topics related to their inquiry]"
         
+        # Get tracing config from centralized tracer
+        trace_config = tracer.get_router_config(
+            call_id=state.get('call_id'),
+            customer_id=state.get('customer_id'),
+            current_flow=current_flow
+        )
+
         classification = self.llm.invoke(
             [SystemMessage(content=system_prompt + context_hint), last_human],
-            config={"tags": ["router_classification"]}
+            config=trace_config
         ).content.strip().lower()
         
         # Sanitize
@@ -251,18 +258,20 @@ class FlowExecutor:
         
         # Build system prompt
         sys_msg = self._build_system_message(flow, is_verified, customer_id)
-        
+
+        # Get tracing config from centralized tracer
+        trace_config = tracer.get_executor_config(
+            flow=flow,
+            call_id=state.get('call_id'),
+            customer_id=customer_id,
+            is_verified=is_verified,
+            tool_count=len(flow_tools)
+        )
+
         # Invoke LLM with tracing
         response = llm.invoke(
             [SystemMessage(content=sys_msg)] + messages,
-            config={
-                "tags": [f"flow:{flow}"],
-                "metadata": {
-                    "customer_id": customer_id,
-                    "is_verified": is_verified,
-                    "active_flow": flow
-                }
-            }
+            config=trace_config
         )
         
         # Debug logging for tool calls
