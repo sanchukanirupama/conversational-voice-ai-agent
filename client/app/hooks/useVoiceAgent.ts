@@ -3,6 +3,8 @@ import { useAudioRecorder } from './useAudioRecorder';
 import { getAudioContext, playRingingTone, stopRingingTone, playDisconnectTone, decodeBase64Audio } from '../utils/audio';
 import { RingingNodes, WSMessage } from '../types';
 
+const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
+
 export function useVoiceAgent() {
     const [isCallActive, setIsCallActive] = useState(false);
     const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
@@ -186,7 +188,7 @@ export function useVoiceAgent() {
         ringingNodesRef.current = playRingingTone(audioContext.current);
 
         // WS Connect
-        const wsUrl = `ws://${window.location.hostname}:8000/ws`;
+        const wsUrl = `${WS_BASE_URL}/ws`;
         ws.current = new WebSocket(wsUrl);
 
         ws.current.onopen = () => {
