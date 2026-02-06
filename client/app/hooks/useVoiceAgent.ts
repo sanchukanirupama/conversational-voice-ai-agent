@@ -19,12 +19,18 @@ export function useVoiceAgent() {
     const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
     const ringingNodesRef = useRef<RingingNodes | null>(null);
     const hasGreetingPlayedRef = useRef(false);
+    const isRecordingRef = useRef(false); // Track recording state for callbacks
 
 
     const startIdleTimer = useCallback(() => {
         if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
         idleTimerRef.current = setTimeout(() => {
             console.log('Idle timeout triggered');
+            // Safety check: don't send timeout if user is actively recording
+            if (isRecordingRef.current) {
+                console.log('Timeout cancelled - user is recording');
+                return;
+            }
             if (ws.current && ws.current.readyState === WebSocket.OPEN) {
                 ws.current.send(JSON.stringify({ type: 'timeout' }));
             }
@@ -93,6 +99,15 @@ export function useVoiceAgent() {
             stopIdleTimer();
         },
     });
+
+    // Update ref and stop idle timer when recording state changes
+    useEffect(() => {
+        isRecordingRef.current = isRecording;
+        if (isRecording) {
+            console.log('Recording started - stopping idle timer');
+            stopIdleTimer();
+        }
+    }, [isRecording, stopIdleTimer]);
 
     const playAudio = async (base64Audio: string) => {
         try {

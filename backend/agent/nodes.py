@@ -47,6 +47,7 @@ class RouterNode:
             Dictionary with updated active_flow
         """
         messages = state['messages']
+        current_flow = state.get('active_flow', 'general')
         
         # Get last human message
         last_human = next(
@@ -54,12 +55,21 @@ class RouterNode:
             None
         )
         if not last_human:
-            return {"active_flow": "general"}
+            return {"active_flow": current_flow}
         
         # Try keyword-based classification first (for high-confidence cases)
         keyword_flow = self._classify_by_keywords(last_human.content)
         if keyword_flow:
+            print(f"[ROUTER DEBUG] Keyword match: '{last_human.content}' → {keyword_flow}")
             return {"active_flow": keyword_flow}
+        
+        # If already in a specific flow (not general), maintain it unless message indicates topic change
+        if current_flow != 'general':
+            # Check if message looks like a response to agent's question or continuation
+            is_continuation = self._is_continuation(last_human.content)
+            if is_continuation:
+                print(f"[ROUTER DEBUG] Continuation detected, maintaining flow: {current_flow}")
+                return {"active_flow": current_flow}
         
         # Get recent context (last 5 messages or fewer)
         recent_messages = messages[-5:] if len(messages) > 5 else messages
@@ -80,9 +90,40 @@ class RouterNode:
         
         # Sanitize
         if classification not in self.flow_config.flow_tools.keys():
+            print(f"[ROUTER DEBUG] LLM classification '{classification}' not in flows, defaulting to general")
             classification = "general"
+        else:
+            print(f"[ROUTER DEBUG] LLM classified: '{last_human.content}' → {classification}")
         
         return {"active_flow": classification}
+    
+    def _is_continuation(self, text: str) -> bool:
+        """Check if text is a continuation response rather than new intent."""
+        text_lower = text.lower().strip()
+        
+        # Short responses are likely continuations
+        if len(text_lower.split()) <= 5:
+            # Check for common continuation patterns
+            continuation_patterns = [
+                'yes', 'no', 'yeah', 'yep', 'nope', 'sure', 'ok', 'okay',
+                'account', 'pin', 'number', 'password',
+                '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',  # numbers
+                'thank', 'please', 'help'
+            ]
+            if any(pattern in text_lower for pattern in continuation_patterns):
+                return True
+        
+        # Check for account/PIN patterns
+        if 'account' in text_lower or 'pin' in text_lower:
+            return True
+        
+        # Check if it's mostly numbers (credentials)
+        words = text_lower.split()
+        number_words = [w for w in words if any(char.isdigit() for char in w)]
+        if len(number_words) >= 2:  # Likely credentials
+            return True
+        
+        return False
     
     def _classify_by_keywords(self, text: str) -> str | None:
         """
@@ -97,15 +138,21 @@ class RouterNode:
         text_lower = text.lower()
         
         # High-priority card/ATM keywords (security-sensitive)
-        card_keywords = [
-            "block card", "freeze card", "lost card", "stolen card",
-            "block my card", "freeze my card", "lost my card", "stolen my card",
-            "card was stolen", "card is lost", "deactivate card",
-            "card declined", "card not working", "atm"
-        ]
+        # Use combination logic: action words + card identifiers
+        card_actions = ['block', 'freeze', 'deactivate', 'cancel', 'lost', 'stolen', 'decline']
+        card_identifiers = ['card', 'credit card', 'debit card', 'atm card']
         
-        for keyword in card_keywords:
-            if keyword in text_lower:
+        # Check if text contains any card action + any card identifier
+        has_card_action = any(action in text_lower for action in card_actions)
+        has_card_identifier = any(identifier in text_lower for identifier in card_identifiers)
+        
+        if has_card_action and has_card_identifier:
+            return "card_atm_issues"
+        
+        # Also check for ATM-related issues
+        if 'atm' in text_lower:
+            atm_issues = ['problem', 'issue', 'not working', 'cash', 'dispens', 'stuck', 'retain']
+            if any(issue in text_lower for issue in atm_issues):
                 return "card_atm_issues"
         
         return None
@@ -218,11 +265,16 @@ class FlowExecutor:
             }
         )
         
+        # Debug logging for tool calls
+        if response.tool_calls:
+            print(f"[DEBUG] Flow: {flow}, Verified: {is_verified}, Customer ID: {customer_id}")
+            print(f"[DEBUG] Tool calls: {response.tool_calls}")
+        
         # Check for termination
         is_call_over = self._check_termination(response)
         
         # Filter out premature t_end_call
-        response = self._filter_premature_termination(response)
+        response = self._filter_premature_termination(response, state)
         
         return {"messages": [response], "is_call_over": is_call_over}
     
@@ -252,11 +304,29 @@ class FlowExecutor:
             flow_tools = self.flow_config.get_tools_for_flow(flow)
             tool_names = [t.name for t in flow_tools if t.name != 't_end_call']
             
+            # Build comprehensive tool usage examples
+            tool_examples = []
+            if 't_get_balance' in tool_names:
+                tool_examples.append(f"- Check balance: t_get_balance(customer_id='{customer_id}')")
+            if 't_block_card' in tool_names:
+                tool_examples.append(f"- Block card: t_block_card(customer_id='{customer_id}')")
+            if 't_get_transactions' in tool_names:
+                tool_examples.append(f"- Get transactions: t_get_transactions(customer_id='{customer_id}')")
+            if 't_update_address' in tool_names:
+                tool_examples.append(f"- Update address: t_update_address(customer_id='{customer_id}', new_address='...')")
+            
+            examples_str = "\n".join(tool_examples) if tool_examples else ""
+            
             permission_note = (
                 f"\n\n[SYSTEM UPDATE]: User is VERIFIED (Customer ID: {customer_id}). "
-                "You have permission to disclose account details and perform actions. "
-                f"To check balance, call tool: t_get_balance(customer_id='{customer_id}'). "
-                "Proceed with the user's request immediately."
+                "You have permission to disclose account details and perform actions.\n"
+                f"\n🔑 CRITICAL: For ALL tool calls, you MUST use customer_id='{customer_id}'.\n"
+                f"\n⚡ IMMEDIATE ACTION: When user confirms an action (says yes, sure, okay, please do it, etc.), "
+                "you MUST IMMEDIATELY CALL THE TOOL. DO NOT just describe what will happen. "
+                "For example, if user says 'yes block my card', you MUST call t_block_card(customer_id='{customer_id}') RIGHT NOW, "
+                "not just say 'your card will be blocked'.\n"
+                f"\nTool Usage Examples:\n{examples_str}\n"
+                "\nProceed with the user's request immediately using these tools."
             )
             
             # Add strong tool usage enforcement
@@ -381,9 +451,16 @@ class FlowExecutor:
                 # Heuristic: If agent text suggests continuation, ignore end_call
                 text_content = str(response.content).lower()
                 is_continuation = (
-                    "check" in text_content or 
-                    "verify" in text_content or 
-                    "assist" in text_content
+                    "verif" in text_content or      # catches verify, verified, verifying, verification
+                    "check" in text_content or
+                    "assist" in text_content or
+                    "help" in text_content or
+                    "being" in text_content or      # catches "is being verified"
+                    "will" in text_content or       # catches "will help you"
+                    "need" in text_content or       # catches "need to verify"
+                    "provide" in text_content or    # catches "please provide"
+                    "account" in text_content or    # catches "your account"
+                    "identity" in text_content      # catches "verify identity"
                 )
                 
                 if not other_tools_present and not is_continuation:
@@ -391,11 +468,33 @@ class FlowExecutor:
         
         return is_call_over
     
-    def _filter_premature_termination(self, response):
-        """Remove t_end_call if other tools are present."""
+    def _filter_premature_termination(self, response, state: AgentState):
+        """Remove t_end_call if inappropriate or other tools are present."""
         if not response.tool_calls:
             return response
         
+        # Check if user actually expressed goodbye intent
+        messages = state.get('messages', [])
+        last_human = next(
+            (m for m in reversed(messages) if isinstance(m, HumanMessage)),
+            None
+        )
+        
+        user_wants_to_end = False
+        if last_human:
+            last_text = last_human.content.lower()
+            goodbye_phrases = ['bye', 'goodbye', 'thanks', 'thank you', "that's all", 'hang up', 'end call', 'no thanks']
+            user_wants_to_end = any(phrase in last_text for phrase in goodbye_phrases)
+        
+        # If user didn't say goodbye, ALWAYS filter t_end_call
+        if not user_wants_to_end:
+            response.tool_calls = [
+                tc for tc in response.tool_calls
+                if tc['name'] != 't_end_call'
+            ]
+            return response
+        
+        # Original logic: Remove t_end_call if other tools are present
         other_tools_present = any(
             tc['name'] != 't_end_call' 
             for tc in response.tool_calls

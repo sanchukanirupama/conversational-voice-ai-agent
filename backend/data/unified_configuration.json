@@ -202,7 +202,7 @@
       "max_questions_before_escalation": 1,
       "description": "Greetings, unclear intent, chitchat, or requests outside defined flows.",
       "requires_verification": false,
-      "tools": [],
+      "tools": ["t_verify_identity"],
       "conversation_strategy": {
         "description": "Greet warmly, attempt to understand intent, route to appropriate flow or escalate if unclear."
       },
@@ -228,5 +228,5 @@
       "account_closure": "Our customer retention team will call you back shortly to discuss your options and assist with the closure process if you choose to proceed."
     }
   },
-  "stt_prompt": "Bank ABC. Customer ID. PIN number. OTP code. ATM. beneficiary. card declined. disputed transaction."
+  "stt_prompt": "Bank ABC customer service. Common phrases: account number, PIN, yes, no, block card, lost card, stolen card, balance, transactions, verify identity, thank you, goodbye."
 }

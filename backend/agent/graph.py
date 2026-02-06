@@ -46,7 +46,7 @@ class AgentGraphBuilder:
         workflow.add_edge("router", "gate")
         workflow.add_edge("gate", "agent")
         workflow.add_conditional_edges("agent", self._should_continue)
-        workflow.add_edge("tools", "gate")  # Loop back after tool execution
+        workflow.add_edge("tools", "router")
         
         return workflow.compile()
     
