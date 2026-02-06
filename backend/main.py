@@ -3,11 +3,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
 from backend.services.langsmith_config import init_langsmith
 from backend.routes import websocket, admin
+from backend.startup import startup
 
 # Initialize Services
 init_langsmith()
 
 app = FastAPI(title="Bank ABC Voice AI")
+
+@app.on_event("startup")
+async def on_startup():
+    """Run startup tasks when the application starts."""
+    startup()
 
 app.add_middleware(
     CORSMiddleware,

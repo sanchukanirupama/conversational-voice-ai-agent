@@ -218,3 +218,24 @@ async def get_call_details(call_id: str, payload: dict = Depends(verify_token)):
         )
     
     return active_calls[call_id]
+
+
+@router.get("/customers")
+async def get_customers(payload: dict = Depends(verify_token)):
+    """Get list of all customers"""
+    from backend.db.database import get_db
+    from backend.db.models import Customer
+    
+    try:
+        with get_db() as session:
+            customers = session.query(Customer).all()
+            return {
+                "customers": [customer.to_dict() for customer in customers],
+                "total": len(customers)
+            }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching customers: {str(e)}"
+        )
+

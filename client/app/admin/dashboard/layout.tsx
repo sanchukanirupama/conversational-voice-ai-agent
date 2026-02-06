@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/hooks/useAuth';
-import { LogOut, Settings, Activity } from 'lucide-react';
+import { LogOut, Settings, Activity, Users } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminDashboardLayout({
@@ -63,6 +63,14 @@ export default function AdminDashboardLayout({
           >
             <Settings className="w-5 h-5 group-hover:text-emerald-400 transition-colors" />
             <span className="font-medium">Configuration</span>
+          </Link>
+
+          <Link
+            href="/admin/dashboard/customers"
+            className="flex items-center gap-3 px-4 py-3 text-white/60 hover:text-white hover:bg-emerald-500/10 hover:border-emerald-500/20 border border-transparent rounded-xl transition-all group"
+          >
+            <Users className="w-5 h-5 group-hover:text-emerald-400 transition-colors" />
+            <span className="font-medium">Customers</span>
           </Link>
 
           <Link
