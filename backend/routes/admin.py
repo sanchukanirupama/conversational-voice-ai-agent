@@ -1,6 +1,7 @@
 import json
 import os
-from datetime import datetime, timedelta
+import asyncio
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -13,6 +14,9 @@ security = HTTPBearer()
 
 # Global store for active calls (in-memory for MVP)
 active_calls: Dict[str, Dict[str, Any]] = {}
+
+# Lock for thread-safe access to active_calls
+active_calls_lock = asyncio.Lock()
 
 
 # Pydantic Models
@@ -50,12 +54,13 @@ class ActiveCall(BaseModel):
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Create a JWT access token"""
     to_encode = data.copy()
+    now = datetime.now(timezone.utc)
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = now + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
-    
-    to_encode.update({"exp": expire, "iat": datetime.utcnow()})
+        expire = now + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
+
+    to_encode.update({"exp": expire, "iat": now})
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
@@ -118,16 +123,22 @@ async def verify_admin_token(payload: dict = Depends(verify_token)):
 async def get_configuration(payload: dict = Depends(verify_token)):
     """Get the current unified configuration"""
     config_path = settings.PROMPTS_FILE
-    
-    if not os.path.exists(config_path):
+
+    # Check file existence in thread pool
+    exists = await asyncio.to_thread(os.path.exists, config_path)
+    if not exists:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Configuration file not found"
         )
-    
+
     try:
-        with open(config_path, 'r') as f:
-            config = json.load(f)
+        # Read file in thread pool to avoid blocking event loop
+        def read_config():
+            with open(config_path, 'r') as f:
+                return json.load(f)
+
+        config = await asyncio.to_thread(read_config)
         return config
     except Exception as e:
         raise HTTPException(
@@ -143,37 +154,44 @@ async def update_configuration(
 ):
     """Update the unified configuration file"""
     config_path = settings.PROMPTS_FILE
-    
+    backup_path = config_path + ".backup"
+
     try:
-        # Create backup of current config
-        backup_path = config_path + ".backup"
-        if os.path.exists(config_path):
-            with open(config_path, 'r') as f:
-                backup_data = f.read()
-            with open(backup_path, 'w') as f:
-                f.write(backup_data)
-        
-        # Write new configuration
-        with open(config_path, 'w') as f:
-            json.dump(request.config, f, indent=2)
-        
-        # Reload configuration in settings
-        settings.reload_prompts()
-        
+        # All file operations in thread pool to avoid blocking
+        def backup_and_update():
+            # Create backup of current config
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    backup_data = f.read()
+                with open(backup_path, 'w') as f:
+                    f.write(backup_data)
+
+            # Write new configuration
+            with open(config_path, 'w') as f:
+                json.dump(request.config, f, indent=2)
+
+        await asyncio.to_thread(backup_and_update)
+
+        # Reload configuration in settings (also run in thread pool)
+        await asyncio.to_thread(settings.reload_prompts)
+
         return {
             "success": True,
             "message": "Configuration updated successfully",
             "updated_by": payload.get('sub'),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
         # Restore from backup if update failed
-        if os.path.exists(backup_path):
-            with open(backup_path, 'r') as f:
-                backup_data = f.read()
-            with open(config_path, 'w') as f:
-                f.write(backup_data)
-        
+        def restore_backup():
+            if os.path.exists(backup_path):
+                with open(backup_path, 'r') as f:
+                    backup_data = f.read()
+                with open(config_path, 'w') as f:
+                    f.write(backup_data)
+
+        await asyncio.to_thread(restore_backup)
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error updating configuration: {str(e)}"
@@ -183,17 +201,23 @@ async def update_configuration(
 @router.get("/calls/live", response_model=List[ActiveCall])
 async def get_live_calls(payload: dict = Depends(verify_token)):
     """Get list of currently active calls"""
-    current_time = datetime.utcnow()
+    current_time = datetime.now(timezone.utc)
     live_calls = []
-    
-    for call_id, call_data in active_calls.items():
+
+    # Use lock to safely access shared active_calls dict
+    async with active_calls_lock:
+        # Create a snapshot to avoid holding lock during processing
+        calls_snapshot = dict(active_calls)
+
+    # Process outside of lock to minimize lock duration
+    for call_id, call_data in calls_snapshot.items():
         start_time = datetime.fromisoformat(call_data['start_time'])
         duration = int((current_time - start_time).total_seconds())
-        
+
         # Get latest message from transcript
         transcript = call_data.get('transcript', [])
         latest_message = transcript[-1] if transcript else None
-        
+
         live_calls.append(ActiveCall(
             call_id=call_id,
             customer_id=call_data.get('customer_id'),
@@ -204,20 +228,21 @@ async def get_live_calls(payload: dict = Depends(verify_token)):
             message_count=len(transcript),
             latest_message=latest_message
         ))
-    
+
     return live_calls
 
 
 @router.get("/calls/{call_id}")
 async def get_call_details(call_id: str, payload: dict = Depends(verify_token)):
-    """Get detailed information about a specific call"""
-    if call_id not in active_calls:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Call not found"
-        )
-    
-    return active_calls[call_id]
+    """Get detailed information about a specific call (thread-safe)"""
+    async with active_calls_lock:
+        if call_id not in active_calls:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Call not found"
+            )
+        # Return a copy to avoid external modifications
+        return dict(active_calls[call_id])
 
 
 @router.get("/customers")
@@ -225,14 +250,19 @@ async def get_customers(payload: dict = Depends(verify_token)):
     """Get list of all customers"""
     from backend.db.database import get_db
     from backend.db.models import Customer
-    
+
     try:
-        with get_db() as session:
-            customers = session.query(Customer).all()
-            return {
-                "customers": [customer.to_dict() for customer in customers],
-                "total": len(customers)
-            }
+        # Run database query in thread pool to avoid blocking event loop
+        def fetch_customers():
+            with get_db() as session:
+                customers = session.query(Customer).all()
+                return {
+                    "customers": [customer.to_dict() for customer in customers],
+                    "total": len(customers)
+                }
+
+        result = await asyncio.to_thread(fetch_customers)
+        return result
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
