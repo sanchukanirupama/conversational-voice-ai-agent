@@ -1,7 +1,7 @@
 "use client";
 import { SiriWaveform } from '@/components/ui/siri-waveform';
 import RetroGrid from '@/components/ui/retro-grid';
-import { Mic, PhoneOff, Sparkles } from 'lucide-react';
+import { Mic, PhoneOff, Headset } from 'lucide-react';
 import { useVoiceAgent } from './hooks/useVoiceAgent';
 
 export default function Home() {
@@ -27,7 +27,7 @@ export default function Home() {
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-white" />
+                <Headset className="w-5 h-5 text-white" />
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-white">ABC Bank</h1>
@@ -66,9 +66,6 @@ export default function Home() {
               <SiriWaveform audioLevel={audioLevel} />
             ) : (
               <div className="text-center space-y-4">
-                <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-emerald-400/20 to-teal-600/20 border border-emerald-500/20 flex items-center justify-center">
-                  <Mic className="w-9 h-9 text-emerald-400/60" />
-                </div>
                 <p className="text-white/40 text-lg font-light">
                   Press the button to start a conversation
                 </p>
@@ -119,7 +116,7 @@ export default function Home() {
         {/* Footer */}
         <footer className="relative z-10 py-6 px-6 text-center">
           <p className="text-xs text-white/30">
-            Powered by AI - Secure & Confidential
+            Built by - Sanchuka Nirupama
           </p>
         </footer>
     </div>

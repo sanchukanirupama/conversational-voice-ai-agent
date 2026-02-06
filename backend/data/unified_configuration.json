@@ -218,8 +218,9 @@
     }
   },
   "escalation_strategies": {
-    "deep_flows_default_message": "I understand this requires specialized assistance. Let me connect you to one of our specialists who can help you further. Please hold for a moment.",
-    "shallow_flows_default_message": "",
+    "card_atm_issues_default_message": "I understand this is an urgent security matter. Let me connect you to our card security specialist who can provide immediate assistance. Please hold for a moment.",
+    "account_servicing_default_message": "I understand you need assistance with your account. Let me connect you to one of our account specialists who can help you further. Please hold for a moment.",
+    "general_default_message": "Let me connect you to one of our specialists who can help you further. Please hold for a moment.",
     "escalation_message_templates": {
       "account_opening": "I'll have our account specialist call you back shortly to guide you through the process.",
       "digital_app_support": "Our technical support team will call you back shortly to investigate and resolve this app issue.",

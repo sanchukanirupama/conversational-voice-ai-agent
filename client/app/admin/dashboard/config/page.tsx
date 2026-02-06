@@ -295,7 +295,7 @@ export default function ConfigEditorPage() {
                               />
                               Requires Identity Verification
                             </label>
-                            <div>
+                            {/* <div>
                               <label className="block text-xs text-white/60 mb-1">Max Questions Before Escalation (null = unlimited)</label>
                               <input
                                 type="number"
@@ -304,7 +304,7 @@ export default function ConfigEditorPage() {
                                 className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                                 placeholder="null"
                               />
-                            </div>
+                            </div> */}
                           </div>
                         </div>
                       </div>
@@ -321,7 +321,7 @@ export default function ConfigEditorPage() {
                       </div>
 
                       {/* Tools */}
-                      <div>
+                      {/* <div>
                         <label className="block text-sm font-medium text-white/80 mb-2">Available Tools (comma-separated)</label>
                         <input
                           type="text"
@@ -330,7 +330,7 @@ export default function ConfigEditorPage() {
                           className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                           placeholder="t_verify_identity, t_block_card..."
                         />
-                      </div>
+                      </div> */}
 
                       {/* Pre-Verification Instructions */}
                       {flowData.flow_instructions?.pre_verification && (
@@ -447,11 +447,31 @@ export default function ConfigEditorPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-white/80 mb-2">
-                    Deep Flows Default Message
+                    Card/ATM Issues - Default Escalation Message
                   </label>
                   <textarea
-                    value={config.escalation_strategies.deep_flows_default_message || ''}
-                    onChange={(e) => updateConfig('escalation_strategies.deep_flows_default_message', e.target.value)}
+                    value={config.escalation_strategies.card_atm_issues_default_message || ''}
+                    onChange={(e) => updateConfig('escalation_strategies.card_atm_issues_default_message', e.target.value)}
+                    className="w-full h-20 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white/80 mb-2">
+                    Account Servicing - Default Escalation Message
+                  </label>
+                  <textarea
+                    value={config.escalation_strategies.account_servicing_default_message || ''}
+                    onChange={(e) => updateConfig('escalation_strategies.account_servicing_default_message', e.target.value)}
+                    className="w-full h-20 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white/80 mb-2">
+                    General - Default Escalation Message
+                  </label>
+                  <textarea
+                    value={config.escalation_strategies.general_default_message || ''}
+                    onChange={(e) => updateConfig('escalation_strategies.general_default_message', e.target.value)}
                     className="w-full h-20 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
                   />
                 </div>

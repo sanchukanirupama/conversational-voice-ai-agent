@@ -12,29 +12,29 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-# Node (frontend)
-frontend/node_modules/
-frontend/.pnp
-frontend/.pnp.*
-frontend/.yarn/*
-!frontend/.yarn/patches
-!frontend/.yarn/plugins
-!frontend/.yarn/releases
-!frontend/.yarn/versions
-frontend/coverage/
+# Node (client)
+client/node_modules/
+client/.pnp
+client/.pnp.*
+client/.yarn/*
+!client/.yarn/patches
+!client/.yarn/plugins
+!client/.yarn/releases
+!client/.yarn/versions
+client/coverage/
 
 # Next.js
-frontend/.next/
-frontend/out/
-frontend/build/
-frontend/*.tsbuildinfo
-frontend/next-env.d.ts
+client/.next/
+client/out/
+client/build/
+client/*.tsbuildinfo
+client/next-env.d.ts
 
 # Next.js logs
-frontend/npm-debug.log*
-frontend/yarn-debug.log*
-frontend/yarn-error.log*
-frontend/.pnpm-debug.log*
+client/npm-debug.log*
+client/yarn-debug.log*
+client/yarn-error.log*
+client/.pnpm-debug.log*
 
 # Vercel
-frontend/.vercel
+client/.vercel

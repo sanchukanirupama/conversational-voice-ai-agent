@@ -231,17 +231,16 @@ class FlowConfig:
         if flow_name in templates:
             return templates[flow_name]
         
-        # Default escalation message based on flow type
-        if self.is_deep_flow(flow_name):
-            return self.escalation_strategies.get(
-                "deep_flows_default_message",
-                "Let me connect you to one of our specialists who can assist you further."
-            )
-        else:
-            return self.escalation_strategies.get(
-                "shallow_flows_default_message", 
-                "Let me connect you to a specialist who can help you with this."
-            )
+        # Check for flow-specific default messages
+        flow_default_key = f"{flow_name}_default_message"
+        if flow_default_key in self.escalation_strategies:
+            return self.escalation_strategies[flow_default_key]
+        
+        # Final fallback to general default message
+        return self.escalation_strategies.get(
+            "general_default_message",
+            "Let me connect you to one of our specialists who can help you further."
+        )
     
     def get_verification_prompt(self, prompt_type: str = "initial_request") -> str:
         """
