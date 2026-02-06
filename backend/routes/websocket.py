@@ -2,7 +2,7 @@ import json
 import asyncio
 import base64
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from backend.agent import app_graph, generate_contextual_response
 from backend.config import settings
@@ -34,15 +34,16 @@ async def websocket_endpoint(websocket: WebSocket):
         "call_id": call_id  # Add call_id for tracing
     }
 
-    # Track this call in active calls for admin monitoring
-    admin.active_calls[call_id] = {
-        "call_id": call_id,
-        "customer_id": None,
-        "start_time": datetime.utcnow().isoformat(),
-        "is_verified": False,
-        "current_flow": None,
-        "transcript": []
-    }
+    # Track this call in active calls for admin monitoring (thread-safe)
+    async with admin.active_calls_lock:
+        admin.active_calls[call_id] = {
+            "call_id": call_id,
+            "customer_id": None,
+            "start_time": datetime.now(timezone.utc).isoformat(),
+            "is_verified": False,
+            "current_flow": None,
+            "transcript": []
+        }
 
     loop = asyncio.get_running_loop()
     silence_count = 0
@@ -139,8 +140,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
             print(f"User: {user_text}")
             
-            # Update call tracking with user message
-            admin.active_calls[call_id]["transcript"].append(f"User: {user_text}")
+            # Update call tracking with user message (thread-safe)
+            async with admin.active_calls_lock:
+                if call_id in admin.active_calls:
+                    admin.active_calls[call_id]["transcript"].append(f"User: {user_text}")
             
             # Invoke Agent
             session_state["messages"].append(HumanMessage(content=user_text))
@@ -167,10 +170,12 @@ async def websocket_endpoint(websocket: WebSocket):
             # Update session state
             session_state = final_state
             
-            # Update call tracking with session state
-            admin.active_calls[call_id]["customer_id"] = session_state.get("customer_id")
-            admin.active_calls[call_id]["is_verified"] = session_state.get("is_verified", False)
-            admin.active_calls[call_id]["transcript"].append(f"Agent: {response_text}")
+            # Update call tracking with session state (thread-safe)
+            async with admin.active_calls_lock:
+                if call_id in admin.active_calls:
+                    admin.active_calls[call_id]["customer_id"] = session_state.get("customer_id")
+                    admin.active_calls[call_id]["is_verified"] = session_state.get("is_verified", False)
+                    admin.active_calls[call_id]["transcript"].append(f"Agent: {response_text}")
             
             print(f"Agent: {response_text}")
             
@@ -203,10 +208,11 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         print("WebSocket Disconnected")
     finally:
-        # Remove from active calls tracking
-        if call_id in admin.active_calls:
-            del admin.active_calls[call_id]
-        
+        # Remove from active calls tracking (thread-safe)
+        async with admin.active_calls_lock:
+            if call_id in admin.active_calls:
+                del admin.active_calls[call_id]
+
         try:
             await websocket.close()
         except:
