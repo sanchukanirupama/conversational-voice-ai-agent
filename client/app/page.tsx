@@ -9,6 +9,7 @@ export default function Home() {
       isCallActive,
       isAgentSpeaking,
       isWaitingForResponse,
+      isWakingServer,
       transcript,
       audioLevel,
       startCall,
@@ -55,7 +56,13 @@ export default function Home() {
             }`}>
               <div className={`w-2 h-2 rounded-full ${isCallActive ? 'bg-emerald-400 animate-pulse' : 'bg-white/30'}`} />
               <span className="text-sm font-medium">
-                {isCallActive ? (isAgentSpeaking ? 'Speaking' : 'Listening') : 'Ready to assist'}
+                {isCallActive
+                  ? (isWakingServer
+                      ? 'Connecting...'
+                      : (isAgentSpeaking ? 'Speaking' : 'Listening')
+                    )
+                  : 'Ready to assist'
+                }
               </span>
             </div>
           </div>
@@ -75,14 +82,22 @@ export default function Home() {
 
           {/* Transcription Display */}
           <div className="w-full max-w-3xl min-h-[80px] flex items-center justify-center px-6 mb-8">
-            {isCallActive && displayMessage && (
+            {isCallActive && isWakingServer && (
+              <div className="flex items-center gap-2 text-white/50">
+                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="ml-2 text-sm font-medium">Waking up server...</span>
+              </div>
+            )}
+            {isCallActive && !isWakingServer && displayMessage && (
               <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-8 py-6 shadow-2xl">
                 <p className="text-xl md:text-2xl text-white/90 leading-relaxed text-center">
                   {displayMessage}
                 </p>
               </div>
             )}
-            {isCallActive && isWaitingForResponse && !displayMessage && (
+            {isCallActive && !isWakingServer && isWaitingForResponse && !displayMessage && (
               <div className="flex items-center gap-2 text-white/50">
                 <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                 <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />

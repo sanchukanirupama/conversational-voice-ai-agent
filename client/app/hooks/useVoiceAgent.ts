@@ -4,6 +4,7 @@ import { getAudioContext, playRingingTone, stopRingingTone, playDisconnectTone, 
 import { RingingNodes, WSMessage } from '../types';
 
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
+const HTTP_BASE_URL = WS_BASE_URL.replace('ws://', 'http://').replace('wss://', 'https://');
 
 export function useVoiceAgent() {
     const [isCallActive, setIsCallActive] = useState(false);
@@ -11,6 +12,7 @@ export function useVoiceAgent() {
     const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
     const [transcript, setTranscript] = useState<string[]>([]);
     const [audioLevel, setAudioLevel] = useState(0);
+    const [isWakingServer, setIsWakingServer] = useState(false);
 
     const ws = useRef<WebSocket | null>(null);
     const audioContext = useRef<AudioContext | null>(null);
@@ -176,23 +178,40 @@ export function useVoiceAgent() {
 
     // -- Main Actions --
 
-    const startCall = useCallback(() => {
-        setIsCallActive(true);
-        shouldDisconnectRef.current = false;
-        hasGreetingPlayedRef.current = false;
-        
-        if (!audioContext.current) audioContext.current = getAudioContext();
-        
-        // Start Ringing
-        stopRingingTone(ringingNodesRef.current);
-        ringingNodesRef.current = playRingingTone(audioContext.current);
+    const wakeUpServer = async (): Promise<boolean> => {
+        try {
+            const response = await fetch(`${HTTP_BASE_URL}/health`, {
+                method: 'GET',
+                signal: AbortSignal.timeout(10000) // 10s timeout
+            });
+            return response.ok;
+        } catch (error) {
+            console.error('Failed to wake up server:', error);
+            return false;
+        }
+    };
 
-        // WS Connect
+    const connectWebSocket = useCallback((retryCount = 0) => {
         const wsUrl = `${WS_BASE_URL}/ws`;
+        const maxRetries = 3;
+
         ws.current = new WebSocket(wsUrl);
 
         ws.current.onopen = () => {
             console.log('WS Connected');
+            setIsWakingServer(false);
+        };
+
+        ws.current.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            if (retryCount < maxRetries) {
+                console.log(`Retrying WebSocket connection (${retryCount + 1}/${maxRetries})...`);
+                setTimeout(() => connectWebSocket(retryCount + 1), 1000 * (retryCount + 1)); // Exponential backoff
+            } else {
+                console.error('Max WebSocket retries reached');
+                setIsWakingServer(false);
+                handleCallEnded();
+            }
         };
 
         ws.current.onmessage = (event) => {
@@ -201,7 +220,7 @@ export function useVoiceAgent() {
                 stopRingingTone(ringingNodesRef.current);
                 ringingNodesRef.current = null;
                 setIsWaitingForResponse(false);
-                
+
                 if (data.content) {
                     setTranscript((prev) => [...prev, `Agent: ${data.content}`]);
                 }
@@ -228,7 +247,34 @@ export function useVoiceAgent() {
                 handleCallEnded();
             }
         };
-    }, [startIdleTimer, handleCallEnded, stopRecording, startRecording, isRecording]);
+    }, [startIdleTimer, handleCallEnded, stopRecording]);
+
+    const startCall = useCallback(async () => {
+        setIsCallActive(true);
+        setIsWakingServer(true);
+        shouldDisconnectRef.current = false;
+        hasGreetingPlayedRef.current = false;
+
+        if (!audioContext.current) audioContext.current = getAudioContext();
+
+        // Start Ringing
+        stopRingingTone(ringingNodesRef.current);
+        ringingNodesRef.current = playRingingTone(audioContext.current);
+
+        // Wake up server first (handles cold start)
+        console.log('Waking up server...');
+        const serverAwake = await wakeUpServer();
+
+        if (!serverAwake) {
+            console.warn('Server health check failed, attempting connection anyway...');
+        }
+
+        // Small delay to ensure server is fully ready
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Now connect to WebSocket
+        connectWebSocket();
+    }, [connectWebSocket]);
 
     const endCall = useCallback(() => {
         if (ws.current) ws.current.close();
@@ -242,6 +288,7 @@ export function useVoiceAgent() {
         isCallActive,
         isAgentSpeaking,
         isWaitingForResponse,
+        isWakingServer,
         transcript,
         audioLevel,
         startCall,

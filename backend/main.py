@@ -30,6 +30,11 @@ app.include_router(admin.router)
 def home():
     return {"status": "Voice AI Backend Running"}
 
+@app.get("/health")
+def health_check():
+    """Health check endpoint to wake up the server from cold start."""
+    return {"status": "ok", "message": "Server is awake and ready"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.main:app", host=settings.HOST, port=settings.PORT, reload=True)
