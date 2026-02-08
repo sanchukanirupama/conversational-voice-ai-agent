@@ -110,18 +110,22 @@ async def websocket_endpoint(websocket: WebSocket):
                 if audio_b64:
                     if "," in audio_b64:
                         audio_b64 = audio_b64.split(",")[1]
-                    
+
                     audio_bytes = base64.b64decode(audio_b64)
-                    
-                    
+                    print(f"Received audio: {len(audio_bytes)} bytes")
+
                     # Guard: skip payloads too small to contain speech
                     if len(audio_bytes) < MIN_AUDIO_BYTES:
-                         # Treat as empty
+                         print(f"Audio too short ({len(audio_bytes)} < {MIN_AUDIO_BYTES} bytes), skipping transcription")
                          user_text = ""
-                    else:    
+                    else:
                         # Run Transcribe in Thread
+                        print(f"Transcribing {len(audio_bytes)} bytes...")
                         user_text = await loop.run_in_executor(None, transcribe_audio, audio_bytes)
-                        print(f"Transcribed: {user_text}")
+                        if user_text:
+                            print(f"Transcribed: '{user_text}'")
+                        else:
+                            print(f"Transcription filtered/empty")
             else:
                  user_text = payload.get("text", "")
             

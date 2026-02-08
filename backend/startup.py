@@ -33,7 +33,7 @@ def load_customers_from_json():
     with open(customers_file, 'r') as f:
         customers_data = json.load(f)
     
-    print(f"\n🔄 Upserting {len(customers_data)} customers into database...")
+    print(f"\n Upserting {len(customers_data)} customers into database...")
     
     with get_db() as db:
         upserted_count = 0
@@ -104,7 +104,7 @@ def startup():
     Run all startup tasks.
     """
     print("\n" + "="*60)
-    print("🚀 Starting Voice AI Backend...")
+    print("Starting Voice AI Backend...")
     print("="*60)
     
     load_customers_from_json()

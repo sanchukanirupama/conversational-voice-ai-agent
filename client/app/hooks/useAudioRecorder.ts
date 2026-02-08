@@ -38,13 +38,14 @@ export function useAudioRecorder({
   useEffect(() => { onSpeechStartRef.current = onSpeechStart; }, [onSpeechStart]);
 
   // VAD Parameters
-  const THRESHOLD = 30;           // Volume threshold (0-255)
-  const SILENCE_DURATION = 800;   // ms of silence before finalising an utterance
-  const MIN_SPEECH_DURATION = 600; // Ignore bursts shorter than this
-  const MIN_BLOB_SIZE = 2000;     // Discard blobs below this byte count (dead-air)
+  const THRESHOLD = 40;           // Volume threshold (0-255) - Increased from 30 to reduce noise triggering
+  const SILENCE_DURATION = 1000;  // ms of silence before finalising an utterance - Increased to 1s
+  const MIN_SPEECH_DURATION = 800; // Ignore bursts shorter than this - Increased from 600ms
+  const MIN_BLOB_SIZE = 3000;     // Discard blobs below this byte count - Increased from 2000 to ensure quality
 
   const startRecording = useCallback(async () => {
     try {
+      console.log('VAD: Requesting microphone access...');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -53,6 +54,7 @@ export function useAudioRecorder({
         },
       });
       streamRef.current = stream;
+      console.log('VAD: Microphone access granted, setting up audio pipeline...');
 
       // Audio-analysis pipeline
       audioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -73,6 +75,7 @@ export function useAudioRecorder({
       mediaRecorder.current.onstop = () => {
         // Recordings aborted because the gate was engaged must never be sent.
         if (isAborting.current) {
+          console.log('VAD: Recording aborted (gate was engaged)');
           isAborting.current = false;
           chunks.current = [];
           return;
@@ -81,9 +84,15 @@ export function useAudioRecorder({
         const duration = Date.now() - speechStartTime.current;
         if (chunks.current.length > 0 && duration > MIN_SPEECH_DURATION) {
           const blob = new Blob(chunks.current, { type: 'audio/webm' });
+          console.log(`VAD: Recording stopped. Duration: ${duration}ms, Size: ${blob.size} bytes`);
+
           if (blob.size >= MIN_BLOB_SIZE) {
             onAudioAvailableRef.current(blob);
+          } else {
+            console.log(`VAD: Rejected - blob too small (${blob.size} < ${MIN_BLOB_SIZE} bytes)`);
           }
+        } else {
+          console.log(`VAD: Rejected - duration too short (${duration}ms < ${MIN_SPEECH_DURATION}ms)`);
         }
         chunks.current = [];
       };
@@ -95,8 +104,11 @@ export function useAudioRecorder({
         // ── Gate: suppress input while the agent is speaking or a response is pending ──
         // If a recording was already in progress when the gate engaged, abort it so that
         // the stale audio is never dispatched to the backend.
-        if (isAgentSpeakingRef.current || isWaitingForResponseRef.current) {
+        const isGated = isAgentSpeakingRef.current || isWaitingForResponseRef.current;
+
+        if (isGated) {
           if (isSpeaking.current) {
+            console.log('VAD: Gate engaged, aborting in-progress recording');
             if (silenceTimer.current) {
               clearTimeout(silenceTimer.current);
               silenceTimer.current = null;
@@ -117,6 +129,7 @@ export function useAudioRecorder({
         if (volume > THRESHOLD) {
           // ── Speech detected ──
           if (!isSpeaking.current) {
+            console.log('VAD: Speech detected, starting recording');
             isSpeaking.current = true;
             speechStartTime.current = Date.now();
             chunks.current = [];
@@ -138,6 +151,7 @@ export function useAudioRecorder({
           // ── Silence ──
           if (isSpeaking.current && !silenceTimer.current) {
             silenceTimer.current = setTimeout(() => {
+              console.log('VAD: Silence detected, finalizing recording');
               isSpeaking.current = false;
               if (mediaRecorder.current && mediaRecorder.current.state === 'recording') {
                 mediaRecorder.current.stop(); // triggers onstop → sends the blob
@@ -152,12 +166,14 @@ export function useAudioRecorder({
 
       checkVolume();
       setIsRecording(true);
+      console.log('VAD: Recording started, listening for speech...');
     } catch (err) {
-      console.error('Error accessing microphone:', err);
+      console.error('VAD: Error accessing microphone:', err);
     }
   }, []);
 
   const stopRecording = useCallback(() => {
+    console.log('VAD: Stopping recording and releasing microphone');
     if (animationFrame.current) cancelAnimationFrame(animationFrame.current);
     if (silenceTimer.current) clearTimeout(silenceTimer.current);
 
@@ -179,6 +195,7 @@ export function useAudioRecorder({
 
     setIsRecording(false);
     isSpeaking.current = false;
+    console.log('VAD: Recording stopped');
   }, []);
 
   return { isRecording, startRecording, stopRecording };

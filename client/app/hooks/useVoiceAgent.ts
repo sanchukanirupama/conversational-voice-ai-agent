@@ -82,6 +82,7 @@ export function useVoiceAgent() {
         isAgentSpeaking,
         isWaitingForResponse,
         onAudioAvailable: (blob) => {
+            console.log(`Audio captured: ${blob.size} bytes, sending to backend`);
             setIsWaitingForResponse(true);
             stopIdleTimer();
 
@@ -91,14 +92,16 @@ export function useVoiceAgent() {
                 const base64data = reader.result as string;
                 if (ws.current && ws.current.readyState === WebSocket.OPEN) {
                     ws.current.send(JSON.stringify({ type: 'audio', data: base64data }));
-                    setTranscript((prev) => [...prev, 'You: ...']); 
+                    setTranscript((prev) => [...prev, 'You: ...']);
+                    console.log('Audio sent to backend, waiting for response...');
                 } else {
+                    console.warn('WebSocket not open, cannot send audio');
                     setIsWaitingForResponse(false);
                 }
             };
         },
         onSpeechStart: () => {
-            console.log('Speech detected - Interrupting Agent');
+            console.log('Speech detected - Interrupting Agent (barge-in)');
             stopAudioPlayback();
             stopIdleTimer();
         },
@@ -150,19 +153,26 @@ export function useVoiceAgent() {
             updateAudioLevel();
 
             source.onended = () => {
+                console.log('Agent finished speaking');
                 setIsAgentSpeaking(false);
                 sourceNodeRef.current = null;
                 if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
                 setAudioLevel(0);
-                
+
                 // Finished speaking -> Start Listening/Idle
-                startIdleTimer();
-                
+                // CRITICAL: Always ensure recording is active after agent finishes
+                // The VAD gate will automatically unblock since isAgentSpeaking is now false
                 if (!isRecording) {
+                    console.log('Starting recording after agent speech');
                     startRecording();
                     hasGreetingPlayedRef.current = true;
+                } else {
+                    console.log('Recording already active, VAD gate will unblock automatically');
                 }
-                
+
+                // Start idle timer AFTER ensuring recording is ready
+                startIdleTimer();
+
                 if (shouldDisconnectRef.current) {
                     handleCallEnded();
                 }
@@ -217,6 +227,7 @@ export function useVoiceAgent() {
         ws.current.onmessage = (event) => {
             const data: WSMessage = JSON.parse(event.data);
             if (data.type === 'audio') {
+                console.log('Received audio response from backend');
                 stopRingingTone(ringingNodesRef.current);
                 ringingNodesRef.current = null;
                 setIsWaitingForResponse(false);
@@ -227,6 +238,7 @@ export function useVoiceAgent() {
                 if (data.audio) {
                     playAudio(data.audio);
                 } else {
+                    console.log('No audio in response, starting idle timer');
                     startIdleTimer();
                 }
             }
