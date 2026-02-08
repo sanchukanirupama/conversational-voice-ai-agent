@@ -47,7 +47,6 @@ export default function Home() {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col items-center justify-start md:justify-center px-6 pt-8 md:pt-0 md:-mt-16">
-          {/* Status Indicator */}
           <div className="mb-8">
             <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-xl border transition-all duration-300 ${
               isCallActive
