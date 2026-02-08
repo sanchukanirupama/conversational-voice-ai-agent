@@ -355,9 +355,19 @@ class FlowExecutor:
         )
         
         termination_safety = (
-            "\n\nTERMINATION RULE: NEVER call t_end_call to finish a task. "
-            "Only call t_end_call when the USER explicitly says goodbye or asks to end the call. "
-            "If you have completed a task (like verification), ask the user what else they need."
+            "\n\n🔚 INTELLIGENT CALL TERMINATION RULES:\n"
+            "1. AFTER completing ANY task, ALWAYS ask: 'Is there anything else I can help you with?'\n"
+            "2. When user responds with 'no', 'nothing else', 'that's all', or goodbye phrases:\n"
+            "   - Say: 'Thank you for calling Bank ABC. Have a great day.'\n"
+            "   - IMMEDIATELY call t_end_call tool\n"
+            "3. NEVER call t_end_call in the middle of a task or conversation\n"
+            "4. NEVER call t_end_call just because you completed a step - always check if user needs more help\n"
+            "5. If user says goodbye at ANY point, respond politely and call t_end_call immediately\n"
+            "6. Examples of when to end:\n"
+            "   - User: 'No, that's all' → End call\n"
+            "   - User: 'Nothing else, thanks' → End call\n"
+            "   - User: 'Goodbye' → End call\n"
+            "   - User: 'I'm good' (after 'anything else?' question) → End call"
         )
         
         tool_execution_style = (
@@ -491,9 +501,39 @@ class FlowExecutor:
         
         user_wants_to_end = False
         if last_human:
-            last_text = last_human.content.lower()
-            goodbye_phrases = ['bye', 'goodbye', 'thanks', 'thank you', "that's all", 'hang up', 'end call', 'no thanks']
+            last_text = last_human.content.lower().strip()
+
+            # Comprehensive goodbye detection patterns
+            goodbye_phrases = [
+                'bye', 'goodbye', 'good bye', 'bye bye',
+                'thanks', 'thank you', 'thanks a lot', 'thank you so much',
+                "that's all", "that's it", "that is all", "that is it",
+                'hang up', 'end call', 'disconnect',
+                'no thanks', 'no thank you',
+                'nothing else', 'nothing more', 'no more',
+                'all done', "i'm done", "we're done", 'done',
+                'have a good', 'have a great', 'take care',
+                'see you', 'talk to you later', 'ttyl'
+            ]
+
+            # Check for explicit goodbye phrases
             user_wants_to_end = any(phrase in last_text for phrase in goodbye_phrases)
+
+            # Check for short "no" responses after "anything else?" question
+            # Look at previous AI message to see if it asked "anything else"
+            if not user_wants_to_end and len(last_text.split()) <= 3:
+                # Get the second-to-last message (AI's question)
+                previous_messages = [m for m in messages if not isinstance(m, HumanMessage)]
+                if previous_messages:
+                    last_ai_msg = previous_messages[-1] if previous_messages else None
+                    if last_ai_msg and hasattr(last_ai_msg, 'content'):
+                        ai_text = str(last_ai_msg.content).lower()
+                        if 'anything else' in ai_text or 'else i can' in ai_text or 'help you with' in ai_text:
+                            # User responded to "anything else?" with a negative
+                            negative_responses = ['no', 'nope', 'nah', 'not really', "i'm good", "i'm ok",
+                                                "that's good", "all good", "we're good", "i'm all set",
+                                                "that'll be all", "that would be all"]
+                            user_wants_to_end = any(resp in last_text for resp in negative_responses)
         
         # If user didn't say goodbye, ALWAYS filter t_end_call
         if not user_wants_to_end:

@@ -20,7 +20,9 @@
       "requires_verification": true,
       "tools": [
         "t_verify_identity",
-        "t_block_card"
+        "t_block_card",
+        "t_get_balance",
+        "t_get_transactions"
       ],
       "strict_keywords": [
         "block card",
@@ -56,11 +58,17 @@
           "After blocking: Inform replacement arrives in 5-7 days, offer branch visit for temporary card",
           "For DECLINED card: Ask when/where declined, use t_block_card if fraud suspected",
           "For ATM issues: Ask location and issue details, use t_block_card if card was retained",
+          "MULTI-ACTION SUPPORT: You can handle multiple requests in the same conversation after verification",
+          "If customer asks for BALANCE after card action: Use t_get_balance(customer_id) immediately",
+          "If customer asks for TRANSACTIONS after card action: Use t_get_transactions(customer_id) immediately",
           "After ANY action: Ask 'Is there anything else about your card or account?'",
+          "CALL ENDING: If customer says 'no', 'nothing else', or goodbye phrases, thank them and call t_end_call immediately",
+          "When ending: Say 'Thank you for calling Bank ABC. Have a great day.' then call t_end_call tool",
           "Only escalate if: technical tool failure, fraud dispute, or explicit customer request for human"
         ],
         "edge_cases": [
-          "If customer mentions both card AND balance check: Prioritize card security, then offer to check balance",
+          "If customer mentions both card AND balance check: Prioritize card security first, then IMMEDIATELY use t_get_balance to check balance",
+          "If customer asks for balance AFTER blocking card: Use t_get_balance(customer_id) right away - you're already verified",
           "If customer wants to dispute transactions: Explain that's a separate process and offer to connect to fraud department",
           "If card blocking fails technically: Apologize, explain the issue, and immediately offer human agent escalation",
           "If customer has multiple cards: Ask which card specifically (usually the most recent one)"
@@ -109,7 +117,9 @@
           "After address update: Confirm update successful, inform updated address will reflect in 24 hours",
           "For PHONE UPDATE: Ask for new phone, use t_update_phone if available, else inform to visit branch",
           "CRITICAL: Use tools to UPDATE information - do NOT escalate for simple profile updates",
-          "Always ask: 'Is there anything else about your account?'"
+          "Always ask: 'Is there anything else about your account?'",
+          "CALL ENDING: If customer says 'no', 'nothing else', or goodbye phrases, thank them and call t_end_call immediately",
+          "When ending: Say 'Thank you for calling Bank ABC. Have a great day.' then call t_end_call tool"
         ],
         "edge_cases": [
           "If customer mentions card blocking: Inform them you'll switch to card services flow",
@@ -136,7 +146,9 @@
           "Immediate action: Offer to:",
           "  - Connect them to a specialist who can help open the account",
           "  - Schedule an appointment at a branch",
-          "  - Provide phone number for account opening department"
+          "  - Provide phone number for account opening department",
+          "CALL ENDING: If customer says goodbye or 'I'll call back later', thank them and call t_end_call immediately",
+          "When ending: Say 'Thank you for calling Bank ABC. Feel free to call us back anytime.' then call t_end_call"
         ],
         "escalation_message": "I'll have our account specialist call you back shortly to guide you through the process."
       }
@@ -158,7 +170,9 @@
           "STRICT RULE: Do NOT provide troubleshooting steps",
           "STRICT RULE: Do NOT give reinstall instructions",
           "STRICT RULE: Do NOT ask more than 2 questions",
-          "STRICT RULE: Always end with the escalation message after 2 questions"
+          "STRICT RULE: Always end with the escalation message after 2 questions",
+          "CALL ENDING: If customer says goodbye or 'I'll try again later', thank them and call t_end_call immediately",
+          "When ending: Say 'Thank you for calling Bank ABC. Have a great day.' then call t_end_call"
         ],
         "escalation_message": "Thank you for that information. Our technical support team will call you back shortly to investigate and resolve this app issue."
       }
@@ -175,7 +189,9 @@
       "flow_instructions": {
         "interaction_pattern": [
           "Question 1: Ask about the nature of the issue (failed transfer, pending payment, beneficiary setup)",
-          "Immediate action: Escalate to payments/transfers specialist with context"
+          "Immediate action: Escalate to payments/transfers specialist with context",
+          "CALL ENDING: If customer says goodbye or changes mind, thank them and call t_end_call immediately",
+          "When ending: Say 'Thank you for calling Bank ABC. Have a great day.' then call t_end_call"
         ],
         "escalation_message": "Transfer and payment issues need immediate attention from our payments team. I'm going to connect you to a specialist who can investigate the transaction status and resolve this for you. They have access to real-time transaction monitoring. Please hold while I transfer you."
       }
@@ -192,7 +208,9 @@
       "flow_instructions": {
         "interaction_pattern": [
           "Question 1: Express regret and ask: 'May I ask what's prompting you to close your account? We'd like to see if there's anything we can do to address your concerns.'",
-          "Immediate action: Escalate to retention specialist regardless of answer"
+          "Immediate action: Escalate to retention specialist regardless of answer",
+          "CALL ENDING: If customer says goodbye or 'I'll think about it', thank them and call t_end_call immediately",
+          "When ending: Say 'Thank you for calling Bank ABC. We hope to see you again.' then call t_end_call"
         ],
         "escalation_message": "I understand, and I appreciate you sharing that with me. Account closures are handled by our customer retention team, who can discuss your concerns and ensure the process goes smoothly if you decide to proceed. They may also be able to offer solutions you might not be aware of. Let me connect you to a specialist now."
       }
@@ -211,7 +229,9 @@
           "If greeting: Respond warmly and ask how you can help",
           "If unclear: Ask one clarifying question about their banking need",
           "If still unclear: Offer to connect to human agent who can better assist",
-          "If non-banking: Politely redirect to banking services or offer human agent"
+          "If non-banking: Politely redirect to banking services or offer human agent",
+          "CALL ENDING: If customer says goodbye, just greets briefly, or has no request, thank them and call t_end_call immediately",
+          "When ending: Say 'Thank you for calling Bank ABC. Have a great day.' then call t_end_call"
         ],
         "escalation_message": "Our account services team will call you back shortly to assist with this."
       }
