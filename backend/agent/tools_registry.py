@@ -66,7 +66,13 @@ def t_update_address(customer_id: str, new_address: str) -> str:
 
 @tool
 def t_end_call() -> str:
-    """Terminates the call. ONLY use this if the user explicitly says goodbye or asks to hang up."""
+    """Terminates the call. Use this when:
+    1. User says goodbye, asks to hang up, or indicates they're done
+    2. User says they don't need help or have no banking needs
+    3. You've completed helping the user and they have no more questions
+    4. Conversation has reached a natural conclusion
+
+    IMPORTANT: ALWAYS call this tool immediately after saying your goodbye message."""
     return "Call terminated."
 
 

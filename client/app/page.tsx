@@ -71,54 +71,62 @@ export default function Home() {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col items-center justify-start md:justify-center px-6 pt-8 md:pt-0 md:-mt-16">
-          <div className="mb-8 flex flex-col items-center gap-3">
-            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-xl border transition-all duration-300 ${
-              isCallActive
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                : 'bg-white/5 border-white/10 text-white/50'
-            }`}>
-              <div className={`w-2 h-2 rounded-full ${isCallActive ? 'bg-emerald-400 animate-pulse' : 'bg-white/30'}`} />
-              <span className="text-sm font-medium">
-                {isCallActive
-                  ? (isWakingServer
-                      ? 'Connecting...'
-                      : (isAgentSpeaking ? 'Speaking' : 'Listening')
-                    )
-                  : 'Ready to assist'
-                }
-              </span>
+          {/* Status Badge - Only show when call is active */}
+          {isCallActive && (
+            <div className="mb-8">
+              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-xl border transition-all duration-300 ${
+                isCallActive
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                  : 'bg-white/5 border-white/10 text-white/50'
+              }`}>
+                <div className={`w-2 h-2 rounded-full ${isCallActive ? 'bg-emerald-400 animate-pulse' : 'bg-white/30'}`} />
+                <span className="text-sm font-medium">
+                  {isWakingServer
+                    ? 'Connecting...'
+                    : (isAgentSpeaking ? 'Speaking' : 'Listening')
+                  }
+                </span>
+              </div>
             </div>
-
-            {/* Microphone Status Indicator */}
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${
-              micPermission === 'granted'
-                ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
-                : micPermission === 'denied'
-                ? 'bg-red-500/10 border border-red-500/30 text-red-400'
-                : 'bg-yellow-500/10 border border-yellow-500/30 text-yellow-400'
-            }`}>
-              {micPermission === 'granted' ? (
-                <>
-                  <Mic className="w-3 h-3" />
-                  <span>Mic Ready</span>
-                </>
-              ) : micPermission === 'denied' ? (
-                <>
-                  <MicOff className="w-3 h-3" />
-                  <span>Mic Blocked</span>
-                </>
-              ) : (
-                <span>Checking...</span>
-              )}
-            </div>
-          </div>
+          )}
 
           {/* Waveform Visualization */}
           <div className="w-full max-w-4xl h-80 flex items-center justify-center mb-8">
             {isCallActive ? (
               <SiriWaveform audioLevel={audioLevel} />
             ) : (
-              <div className="text-center space-y-4">
+              <div className="text-center space-y-6">
+                {/* Status Badges - Show when not in call */}
+                <div className="flex flex-col items-center gap-3 mb-6">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-xl border transition-all duration-300 bg-white/5 border-white/10 text-white/50">
+                    <div className="w-2 h-2 rounded-full bg-white/30" />
+                    <span className="text-sm font-medium">Ready to assist</span>
+                  </div>
+
+                  {/* Microphone Status Indicator */}
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${
+                    micPermission === 'granted'
+                      ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                      : micPermission === 'denied'
+                      ? 'bg-red-500/10 border border-red-500/30 text-red-400'
+                      : 'bg-yellow-500/10 border border-yellow-500/30 text-yellow-400'
+                  }`}>
+                    {micPermission === 'granted' ? (
+                      <>
+                        <Mic className="w-3 h-3" />
+                        <span>Mic Ready</span>
+                      </>
+                    ) : micPermission === 'denied' ? (
+                      <>
+                        <MicOff className="w-3 h-3" />
+                        <span>Mic Blocked</span>
+                      </>
+                    ) : (
+                      <span>Checking...</span>
+                    )}
+                  </div>
+                </div>
+
                 <p className="text-white/40 text-lg font-light">
                   Press the button to start a conversation
                 </p>
@@ -192,7 +200,7 @@ export default function Home() {
         {/* Footer */}
         <footer className="relative z-10 py-6 px-6 text-center">
           <p className="text-xs text-white/30">
-            Built by - Sanchuka Nirupama
+            Built by Sanchuka Nirupama
           </p>
         </footer>
     </div>
