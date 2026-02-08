@@ -1,10 +1,13 @@
 "use client";
+import { useEffect, useState } from 'react';
 import { SiriWaveform } from '@/components/ui/siri-waveform';
 import RetroGrid from '@/components/ui/retro-grid';
-import { Mic, PhoneOff, Headset } from 'lucide-react';
+import { Mic, PhoneOff, Headset, MicOff } from 'lucide-react';
 import { useVoiceAgent } from './hooks/useVoiceAgent';
 
 export default function Home() {
+  const [micPermission, setMicPermission] = useState<'granted' | 'denied' | 'prompt' | 'checking'>('checking');
+
   const {
       isCallActive,
       isAgentSpeaking,
@@ -15,6 +18,27 @@ export default function Home() {
       startCall,
       endCall
   } = useVoiceAgent();
+
+  // Request microphone access on page load
+  useEffect(() => {
+    const requestMicrophoneAccess = async () => {
+      try {
+        console.log('🎤 Requesting microphone access on startup...');
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        // Permission granted - immediately release the stream
+        stream.getTracks().forEach(track => track.stop());
+
+        console.log(' Microphone access granted');
+        setMicPermission('granted');
+      } catch (error) {
+        console.error(' Microphone access denied or unavailable:', error);
+        setMicPermission('denied');
+      }
+    };
+
+    requestMicrophoneAccess();
+  }, []);
 
   const lastMessage = transcript.length > 0 ? transcript[transcript.length - 1] : "";
   const displayMessage = lastMessage.replace(/^(You|Agent): /, '');
@@ -36,12 +60,37 @@ export default function Home() {
               </div>
             </div>
 
-            <a
-                href="/admin/login"
-                className="text-sm text-white/60 hover:text-emerald-400 transition-colors duration-200 font-medium"
-            >
-                Admin Portal
-            </a>
+            <div className="flex items-center gap-4">
+              {/* Microphone Status Indicator */}
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${
+                micPermission === 'granted'
+                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                  : micPermission === 'denied'
+                  ? 'bg-red-500/10 border border-red-500/30 text-red-400'
+                  : 'bg-yellow-500/10 border border-yellow-500/30 text-yellow-400'
+              }`}>
+                {micPermission === 'granted' ? (
+                  <>
+                    <Mic className="w-3 h-3" />
+                    <span>Mic Ready</span>
+                  </>
+                ) : micPermission === 'denied' ? (
+                  <>
+                    <MicOff className="w-3 h-3" />
+                    <span>Mic Blocked</span>
+                  </>
+                ) : (
+                  <span>Checking...</span>
+                )}
+              </div>
+
+              <a
+                  href="/admin/login"
+                  className="text-sm text-white/60 hover:text-emerald-400 transition-colors duration-200 font-medium"
+              >
+                  Admin Portal
+              </a>
+            </div>
           </div>
         </header>
 
@@ -109,13 +158,28 @@ export default function Home() {
           {/* Control Button */}
           <div className="relative">
             {!isCallActive ? (
-              <button
-                onClick={startCall}
-                className="group relative flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 hover:from-emerald-500 hover:to-teal-700 shadow-lg hover:shadow-emerald-500/50 transition-all duration-300 hover:scale-105"
-              >
-                <Mic className="w-8 h-8 text-white" />
-                <div className="absolute inset-0 rounded-full bg-emerald-400/20 animate-ping" />
-              </button>
+              <div className="flex flex-col items-center gap-4">
+                <button
+                  onClick={startCall}
+                  disabled={micPermission === 'denied'}
+                  className={`group relative flex items-center justify-center w-20 h-20 rounded-full shadow-lg transition-all duration-300 ${
+                    micPermission === 'denied'
+                      ? 'bg-gray-600 cursor-not-allowed opacity-50'
+                      : 'bg-gradient-to-br from-emerald-400 to-teal-600 hover:from-emerald-500 hover:to-teal-700 hover:shadow-emerald-500/50 hover:scale-105'
+                  }`}
+                >
+                  <Mic className="w-8 h-8 text-white" />
+                  {micPermission === 'granted' && (
+                    <div className="absolute inset-0 rounded-full bg-emerald-400/20 animate-ping" />
+                  )}
+                </button>
+
+                {micPermission === 'denied' && (
+                  <p className="text-sm text-red-400/80 text-center max-w-xs">
+                    Microphone access denied. Please enable it in your browser settings.
+                  </p>
+                )}
+              </div>
             ) : (
               <button
                 onClick={endCall}
