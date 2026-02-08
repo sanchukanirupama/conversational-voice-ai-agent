@@ -60,43 +60,18 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
-              {/* Microphone Status Indicator */}
-              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${
-                micPermission === 'granted'
-                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
-                  : micPermission === 'denied'
-                  ? 'bg-red-500/10 border border-red-500/30 text-red-400'
-                  : 'bg-yellow-500/10 border border-yellow-500/30 text-yellow-400'
-              }`}>
-                {micPermission === 'granted' ? (
-                  <>
-                    <Mic className="w-3 h-3" />
-                    <span>Mic Ready</span>
-                  </>
-                ) : micPermission === 'denied' ? (
-                  <>
-                    <MicOff className="w-3 h-3" />
-                    <span>Mic Blocked</span>
-                  </>
-                ) : (
-                  <span>Checking...</span>
-                )}
-              </div>
-
-              <a
-                  href="/admin/login"
-                  className="text-sm text-white/60 hover:text-emerald-400 transition-colors duration-200 font-medium"
-              >
-                  Admin Portal
-              </a>
-            </div>
+            <a
+                href="/admin/login"
+                className="text-sm text-white/60 hover:text-emerald-400 transition-colors duration-200 font-medium"
+            >
+                Admin Portal
+            </a>
           </div>
         </header>
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col items-center justify-start md:justify-center px-6 pt-8 md:pt-0 md:-mt-16">
-          <div className="mb-8">
+          <div className="mb-8 flex flex-col items-center gap-3">
             <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-xl border transition-all duration-300 ${
               isCallActive
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
@@ -112,6 +87,29 @@ export default function Home() {
                   : 'Ready to assist'
                 }
               </span>
+            </div>
+
+            {/* Microphone Status Indicator */}
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${
+              micPermission === 'granted'
+                ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                : micPermission === 'denied'
+                ? 'bg-red-500/10 border border-red-500/30 text-red-400'
+                : 'bg-yellow-500/10 border border-yellow-500/30 text-yellow-400'
+            }`}>
+              {micPermission === 'granted' ? (
+                <>
+                  <Mic className="w-3 h-3" />
+                  <span>Mic Ready</span>
+                </>
+              ) : micPermission === 'denied' ? (
+                <>
+                  <MicOff className="w-3 h-3" />
+                  <span>Mic Blocked</span>
+                </>
+              ) : (
+                <span>Checking...</span>
+              )}
             </div>
           </div>
 
