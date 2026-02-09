@@ -1,4 +1,4 @@
-# 🎙️ AI Voice Banking Agent
+# AI Voice Banking Agent
 
 A full-stack AI-powered voice banking assistant built with **Next.js**, **FastAPI**, **LangGraph**, and **OpenAI**. The agent handles real-time voice conversations, processes banking requests, and autonomously resolves customer issues using intelligent tool selection.
 
@@ -34,7 +34,6 @@ A full-stack AI-powered voice banking assistant built with **Next.js**, **FastAP
 - 💳 **Card Management** - Block/freeze cards, report lost/stolen
 - 💰 **Account Services** - Balance checks, transaction history
 - 🔐 **Identity Verification** - Secure customer authentication
-- 📝 **Address Updates** - Profile management
 - 📞 **Smart Call Routing** - Intent classification and flow routing
 - 🤖 **Autonomous Problem Solving** - Agent uses tools to resolve issues
 
@@ -170,8 +169,6 @@ npm run dev
 🔧 **Backend API**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 📊 **Admin Dashboard**: [http://localhost:3000/admin/login](http://localhost:3000/admin/login)
-- Username: `admin`
-- Password: `admin123`
 
 ---
 
@@ -205,8 +202,8 @@ npm run dev
 ┌─────────────────────────────────────────────────────────────┐
 │  4. Speech-to-Text (Backend)                                │
 │     • OpenAI Whisper API transcription                      │
-│     • Hallucination filtering (removes "Thanks for          │
-│       watching!", etc.)                                     │
+│     • Hallucination filtering                               │
+│                                                             │
 │     • Minimum audio size: 1000 bytes                        │
 └─────────────────────────────────────────────────────────────┘
                          ▼
@@ -308,7 +305,7 @@ Each flow has:
 
 ---
 
-## 📊 LangSmith Observability
+## 📊 Observability
 
 LangSmith provides full visibility into agent behavior:
 
